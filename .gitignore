@@ -1,0 +1,39 @@
+# macOS 
+.DS_Store
+
+# 虚拟环境
+.venv/
+env/
+venv/
+ENV/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# PyInstaller 构建与临时文件
+build/
+dist/
+*.spec
+*.pyz
+*.pkg
+
+# IDE / 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 本地临时日志或媒体生成文件
+*.mp4
+*.mkv
+*.mov
+*.gif
+snipkin_concat_*.txt
+*.log
+
+# 项目自定义附加包
+/assets/*.icns
+/assets/*.ico

@@ -8,6 +8,7 @@ import datetime
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import tkinter as tk
@@ -19,9 +20,32 @@ import customtkinter as ctk
 # 工具函数
 # ============================================================
 
+def get_executable_path(name: str) -> str:
+    """
+    获取可执行文件（如 ffmpeg, ffprobe）的绝对路径。
+    如果是被 PyInstaller 打包后的运行环境，优先从 sys._MEIPASS 中寻找。
+    否则从系统 PATH 中寻找。
+    在 Windows 下，通常带 .exe 后缀。
+    """
+    import platform
+    is_windows = platform.system() == "Windows"
+    filename = f"{name}.exe" if is_windows else name
+
+    if hasattr(sys, "_MEIPASS"):
+        bundled_path = os.path.join(sys._MEIPASS, filename)
+        if os.path.exists(bundled_path):
+            return bundled_path
+
+    system_path = shutil.which(name)
+    if system_path:
+        return system_path
+
+    return name
+
 def check_ffmpeg_available() -> bool:
-    """检查系统 PATH 中是否存在 ffmpeg"""
-    return shutil.which("ffmpeg") is not None
+    """检查系统或打包环境中是否存在 ffmpeg"""
+    path = get_executable_path("ffmpeg")
+    return path != "ffmpeg" or shutil.which("ffmpeg") is not None
 
 def parse_timecode_to_seconds(timecode: str) -> float:
     """
@@ -62,7 +86,7 @@ def get_video_duration(file_path: str) -> float | None:
     try:
         result = subprocess.run(
             [
-                "ffprobe", "-v", "error",
+                get_executable_path("ffprobe"), "-v", "error",
                 "-show_entries", "format=duration",
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 file_path,
@@ -884,7 +908,7 @@ class VideoClipperApp(ctk.CTk):
 
         # 基础命令：覆盖输出 + 定位 + 时长 + 输入
         command = [
-            "ffmpeg",
+            get_executable_path("ffmpeg"),
             "-y",
             "-ss", start_timecode,
             "-t", duration_timecode,
@@ -1187,7 +1211,7 @@ class VideoClipperApp(ctk.CTk):
         file_count = len(file_list)
 
         # 输入文件参数
-        command = ["ffmpeg", "-y"]
+        command = [get_executable_path("ffmpeg"), "-y"]
         for file_path in file_list:
             command.extend(["-i", file_path])
 
@@ -1272,7 +1296,7 @@ class VideoClipperApp(ctk.CTk):
         """
         file_count = len(file_list)
 
-        command = ["ffmpeg", "-y"]
+        command = [get_executable_path("ffmpeg"), "-y"]
         for file_path in file_list:
             command.extend(["-i", file_path])
 
@@ -1321,7 +1345,7 @@ class VideoClipperApp(ctk.CTk):
         self._concat_temp_file.close()
 
         command = [
-            "ffmpeg", "-y",
+            get_executable_path("ffmpeg"), "-y",
             "-f", "concat",
             "-safe", "0",
             "-i", self._concat_temp_file.name,
