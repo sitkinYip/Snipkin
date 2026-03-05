@@ -4,6 +4,7 @@ Snipkin - 跨平台视频处理工具
 支持 macOS / Windows / Linux，通过 run.sh（macOS/Linux）或 run.bat（Windows）一键启动。
 """
 
+import datetime
 import os
 import shutil
 import subprocess
@@ -458,7 +459,7 @@ class VideoClipperApp(ctk.CTk):
         path_row = ctk.CTkFrame(section, fg_color="transparent")
         path_row.pack(fill="x", padx=12, pady=(0, 10))
 
-        output_entry = ctk.CTkEntry(path_row, textvariable=self.output_file_path, state="readonly", width=440)
+        output_entry = ctk.CTkEntry(path_row, textvariable=self.output_file_path, width=440)
         output_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         save_button = ctk.CTkButton(path_row, text="保存路径", width=100, command=self._on_select_output_file)
@@ -713,7 +714,7 @@ class VideoClipperApp(ctk.CTk):
         path_row = ctk.CTkFrame(section, fg_color="transparent")
         path_row.pack(fill="x", padx=12, pady=(0, 10))
 
-        output_entry = ctk.CTkEntry(path_row, textvariable=self.concat_output_path, state="readonly", width=440)
+        output_entry = ctk.CTkEntry(path_row, textvariable=self.concat_output_path, width=440)
         output_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         save_button = ctk.CTkButton(path_row, text="保存路径", width=100, command=self._on_concat_select_output)
@@ -756,14 +757,21 @@ class VideoClipperApp(ctk.CTk):
             directory = os.path.dirname(file_path)
             basename = os.path.splitext(os.path.basename(file_path))[0]
             output_format = self.output_format_var.get()
-            default_output = os.path.join(directory, f"{basename}_clip.{output_format}")
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_output = os.path.join(directory, f"{basename}_clip_{timestamp}.{output_format}")
             self.output_file_path.set(default_output)
 
     def _on_select_output_file(self):
         """处理截取 Tab "保存路径"按钮点击事件"""
         output_format = self.output_format_var.get()
+        current_path = self.output_file_path.get().strip()
+        initial_dir = os.path.dirname(current_path) if current_path else None
+        initial_file = os.path.basename(current_path) if current_path else None
+        
         file_path = filedialog.asksaveasfilename(
             title="选择输出文件保存位置",
+            initialdir=initial_dir,
+            initialfile=initial_file,
             defaultextension=f".{output_format}",
             filetypes=[(f"{output_format.upper()} 文件", f"*.{output_format}"), ("所有文件", "*.*")],
         )
@@ -788,6 +796,15 @@ class VideoClipperApp(ctk.CTk):
         if not output_path:
             self._log("❌ 错误: 请先设置输出文件保存路径。")
             return
+
+        out_dir = os.path.dirname(output_path)
+        if out_dir and not os.path.exists(out_dir):
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+                self._log(f"已自动创建输出文件夹: {out_dir}")
+            except Exception as e:
+                self._log(f"❌ 错误: 无法创建输出文件夹: {e}")
+                return
 
         # 解析开始时间（支持 H:MM:SS / MM:SS / SS 格式）
         try:
@@ -975,7 +992,8 @@ class VideoClipperApp(ctk.CTk):
                 first_file = self.concat_file_list[0]
                 directory = os.path.dirname(first_file)
                 output_format = self.concat_output_format_var.get()
-                default_output = os.path.join(directory, f"merged_output.{output_format}")
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                default_output = os.path.join(directory, f"merged_output_{timestamp}.{output_format}")
                 self.concat_output_path.set(default_output)
 
     def _on_concat_remove_file(self):
@@ -1033,8 +1051,14 @@ class VideoClipperApp(ctk.CTk):
     def _on_concat_select_output(self):
         """处理拼接 Tab "保存路径"按钮点击事件"""
         output_format = self.concat_output_format_var.get()
+        current_path = self.concat_output_path.get().strip()
+        initial_dir = os.path.dirname(current_path) if current_path else None
+        initial_file = os.path.basename(current_path) if current_path else None
+
         file_path = filedialog.asksaveasfilename(
             title="选择拼接输出文件保存位置",
+            initialdir=initial_dir,
+            initialfile=initial_file,
             defaultextension=f".{output_format}",
             filetypes=[(f"{output_format.upper()} 文件", f"*.{output_format}"), ("所有文件", "*.*")],
         )
@@ -1063,6 +1087,15 @@ class VideoClipperApp(ctk.CTk):
         if not output_path:
             self._log("❌ 错误: 请先设置输出文件保存路径。")
             return
+
+        out_dir = os.path.dirname(output_path)
+        if out_dir and not os.path.exists(out_dir):
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+                self._log(f"已自动创建输出文件夹: {out_dir}")
+            except Exception as e:
+                self._log(f"❌ 错误: 无法创建输出文件夹: {e}")
+                return
 
         # 解析过渡动画参数
         transition_name = XFADE_TRANSITIONS[self.concat_transition_var.get()]
