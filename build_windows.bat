@@ -57,7 +57,7 @@ echo [信息] 📦 正在执行 PyInstaller 封装主程序并捆绑音视频组
 
 pyinstaller --noconfirm --noconsole --onefile ^
     --name "Snipkin" ^
-    --icon "assets/icon.png" ^
+    --icon "assets/icon.ico" ^
     --add-binary "%FFMPEG_PATH%;." ^
     --add-binary "%FFPROBE_PATH%;." ^
     --hidden-import "PIL._tkinter_finder" ^

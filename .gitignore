@@ -33,7 +33,3 @@ dist/
 *.gif
 snipkin_concat_*.txt
 *.log
-
-# 项目自定义附加包
-/assets/*.icns
-/assets/*.ico
