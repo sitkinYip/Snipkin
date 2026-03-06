@@ -60,6 +60,9 @@ pyinstaller --noconfirm --noconsole --onefile ^
     --icon "assets/icon.ico" ^
     --add-binary "%FFMPEG_PATH%;." ^
     --add-binary "%FFPROBE_PATH%;." ^
+    --hidden-import "flet" ^
+    --hidden-import "flet.core" ^
+    --hidden-import "flet_runtime" ^
     --hidden-import "PIL._tkinter_finder" ^
     main.py
 
