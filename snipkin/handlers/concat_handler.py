@@ -82,7 +82,7 @@ def _refresh_file_list(
 
 
 def handle_concat_add_files_picked(
-    event: ft.FilePickerResultEvent,
+    result: list,
     state: AppState,
     file_list_view: ft.ListView,
     output_path_field: ft.TextField,
@@ -90,20 +90,21 @@ def handle_concat_add_files_picked(
     """
     处理多文件选择完成后的回调。
 
+    Flet 0.82+ 中 pick_files() 直接返回 list[FilePickerFile]。
     将选中的文件添加到拼接列表中（自动去重），
     如果是首次添加文件且输出路径为空，自动生成默认输出路径。
 
     参数:
-        event:             FilePicker 结果事件
+        result:            pick_files() 返回的文件列表
         state:             应用状态实例
         file_list_view:    ListView 控件引用
         output_path_field: 输出路径 TextField 控件
     """
-    if not event.files:
+    if not result:
         return
 
     added_count = 0
-    for picked_file in event.files:
+    for picked_file in result:
         if picked_file.path and picked_file.path not in state.concat_file_list:
             state.concat_file_list.append(picked_file.path)
             added_count += 1
@@ -222,22 +223,24 @@ def handle_concat_clear(
 
 
 def handle_concat_output_picked(
-    event: ft.FilePickerResultEvent,
+    result: str | None,
     state: AppState,
     output_path_field: ft.TextField,
 ) -> None:
     """
     处理输出路径选择完成后的回调。
 
+    Flet 0.82+ 中 save_file() 直接返回 str | None。
+
     参数:
-        event:             FilePicker 结果事件
+        result:            save_file() 返回的文件路径字符串
         state:             应用状态实例
         output_path_field: 输出路径 TextField 控件
     """
-    if event.path:
-        state.concat_output_path = event.path
-        output_path_field.value = event.path
-        _log(state, f"拼接输出路径已设置: {event.path}")
+    if result:
+        state.concat_output_path = result
+        output_path_field.value = result
+        _log(state, f"拼接输出路径已设置: {result}")
         state.page.update()
 
 
@@ -301,7 +304,7 @@ def handle_concat_run(state: AppState) -> None:
     if run_button_container is not None:
         inner_button = run_button_container.content
         inner_button.disabled = True
-        inner_button.text = "处理中..."
+        inner_button.content = ft.Text("处理中...", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.HOURGLASS
         state.page.update()
 
@@ -354,6 +357,6 @@ def _restore_concat_run_button(state: AppState) -> None:
     if run_button_container is not None:
         inner_button = run_button_container.content
         inner_button.disabled = False
-        inner_button.text = "开始拼接"
+        inner_button.content = ft.Text("开始拼接", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.PLAY_ARROW_SOLID
         state.page.update()

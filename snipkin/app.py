@@ -162,7 +162,7 @@ def build_app(page: ft.Page) -> None:
                 ),
                 actions=[
                     ft.TextButton(
-                        "知道了",
+                        content=ft.Text("知道了"),
                         on_click=lambda event: page.close(event.control.parent),
                     ),
                 ],
@@ -189,8 +189,8 @@ def _build_root_layout(state: AppState) -> ft.Stack:
     gradient_background = ft.Container(
         expand=True,
         gradient=ft.LinearGradient(
-            begin=ft.alignment.top_left,
-            end=ft.alignment.bottom_right,
+            begin=ft.Alignment(-1, -1),
+            end=ft.Alignment(1, 1),
             colors=[BACKGROUND_GRADIENT_START, BACKGROUND_GRADIENT_END, "#0f3460"],
         ),
     )
@@ -273,52 +273,43 @@ def _build_content(state: AppState) -> ft.Column:
     clip_tab_content = build_clip_tab(state)
     concat_tab_content = build_concat_tab(state)
 
-    tabs = ft.Tabs(
-        selected_index=0,
-        animation_duration=300,
+    tab_bar = ft.TabBar(
+        tabs=[
+            ft.Tab(label="✂️ 视频截取"),
+            ft.Tab(label="🔗 视频拼接"),
+        ],
         indicator_color=TAB_INDICATOR_COLOR,
-        indicator_border_radius=ft.border_radius.all(4),
         label_color=TEXT_PRIMARY_COLOR,
         unselected_label_color=TAB_UNSELECTED_COLOR,
-        indicator_tab_size=True,
         divider_height=0,
         label_padding=ft.padding.symmetric(horizontal=16, vertical=8),
         label_text_style=ft.TextStyle(
             size=14,
             weight=ft.FontWeight.W_600,
         ),
-        tabs=[
-            ft.Tab(
-                tab_content=ft.Row(
-                    controls=[
-                        ft.Icon(
-                            ft.CupertinoIcons.SCISSORS,
-                            size=16,
-                            color=TAB_INDICATOR_COLOR,
-                        ),
-                        ft.Text("视频截取"),
-                    ],
-                    spacing=6,
-                    tight=True,
-                ),
-                content=clip_tab_content,
-            ),
-            ft.Tab(
-                tab_content=ft.Row(
-                    controls=[
-                        ft.Icon(
-                            ft.CupertinoIcons.LINK,
-                            size=16,
-                            color=TAB_INDICATOR_COLOR,
-                        ),
-                        ft.Text("视频拼接"),
-                    ],
-                    spacing=6,
-                    tight=True,
-                ),
-                content=concat_tab_content,
-            ),
+        unselected_label_text_style=ft.TextStyle(
+            size=14,
+            weight=ft.FontWeight.W_400,
+        ),
+    )
+
+    tab_bar_view = ft.TabBarView(
+        controls=[
+            clip_tab_content,
+            concat_tab_content,
         ],
+        expand=True,
+    )
+
+    tabs = ft.Tabs(
+        selected_index=0,
+        animation_duration=300,
+        length=2,
+        content=ft.Column(
+            controls=[tab_bar, tab_bar_view],
+            spacing=0,
+            expand=True,
+        ),
         expand=True,
     )
 
@@ -463,20 +454,14 @@ def _build_action_button(
         ElevatedButton 组件
     """
     return ft.ElevatedButton(
-        text=text,
+        content=ft.Text(text, size=13, weight=ft.FontWeight.W_500),
         icon=icon,
         on_click=on_click,
+        bgcolor=color,
+        color="#ffffff",
         style=ft.ButtonStyle(
-            bgcolor={
-                ft.ControlState.DEFAULT: color,
-                ft.ControlState.HOVERED: hover_color,
-            },
-            color={
-                ft.ControlState.DEFAULT: "#ffffff",
-            },
             shape=ft.RoundedRectangleBorder(radius=8),
             padding=ft.padding.symmetric(horizontal=16, vertical=10),
-            text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_500),
         ),
         height=38,
     )
@@ -501,20 +486,14 @@ def _build_primary_button(
         主操作 ElevatedButton 组件
     """
     return ft.ElevatedButton(
-        text=text,
+        content=ft.Text(text, size=15, weight=ft.FontWeight.W_600),
         icon=icon,
         on_click=on_click,
+        bgcolor=ACCENT_BLUE,
+        color="#ffffff",
         style=ft.ButtonStyle(
-            bgcolor={
-                ft.ControlState.DEFAULT: ACCENT_BLUE,
-                ft.ControlState.HOVERED: ACCENT_BLUE_HOVER,
-            },
-            color={
-                ft.ControlState.DEFAULT: "#ffffff",
-            },
             shape=ft.RoundedRectangleBorder(radius=10),
             padding=ft.padding.symmetric(horizontal=24, vertical=14),
-            text_style=ft.TextStyle(size=15, weight=ft.FontWeight.W_600),
         ),
         height=46,
         width=float("inf"),

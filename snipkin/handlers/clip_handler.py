@@ -56,7 +56,7 @@ def _log(state: AppState, message: str) -> None:
 
 
 def on_input_file_picked(
-    event: ft.FilePickerResultEvent,
+    result: list,
     state: AppState,
     input_path_field: ft.TextField,
     output_path_field: ft.TextField,
@@ -64,6 +64,7 @@ def on_input_file_picked(
     """
     处理输入文件选择完成后的回调。
 
+    Flet 0.82+ 中 pick_files() 直接返回 list[FilePickerFile]。
     选择输入视频文件后：
       1. 更新输入文件路径显示
       2. 更新 state 中的路径值
@@ -71,13 +72,13 @@ def on_input_file_picked(
       4. 在日志中记录操作
 
     参数:
-        event:             FilePicker 结果事件
+        result:            pick_files() 返回的文件列表
         state:             应用状态实例
         input_path_field:  输入文件路径 TextField 控件
         output_path_field: 输出文件路径 TextField 控件
     """
-    if event.files and len(event.files) > 0:
-        file_path = event.files[0].path
+    if result and len(result) > 0:
+        file_path = result[0].path
         state.input_file_path = file_path
         input_path_field.value = file_path
         _log(state, f"已选择输入文件: {file_path}")
@@ -88,6 +89,28 @@ def on_input_file_picked(
         state.output_file_path = default_output
         output_path_field.value = default_output
 
+        state.page.update()
+
+def on_output_file_picked(
+    result: str | None,
+    state: AppState,
+    output_path_field: ft.TextField,
+) -> None:
+    """
+    处理输出路径选择完成后的回调。
+
+    Flet 0.82+ 中 save_file() 直接返回 str | None。
+    选择保存路径后更新输出文件路径显示和 state 中的值。
+
+    参数:
+        result:            save_file() 返回的文件路径字符串
+        state:             应用状态实例
+        output_path_field: 输出文件路径 TextField 控件
+    """
+    if result:
+        state.output_file_path = result
+        output_path_field.value = result
+        _log(state, f"输出路径已设置: {result}")
         state.page.update()
 
 
@@ -172,7 +195,7 @@ def handle_clip_run(state: AppState) -> None:
     if run_button_container is not None:
         inner_button = run_button_container.content
         inner_button.disabled = True
-        inner_button.text = "处理中..."
+        inner_button.content = ft.Text("处理中...", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.HOURGLASS
         state.page.update()
 
@@ -224,6 +247,6 @@ def _restore_clip_run_button(state: AppState) -> None:
     if run_button_container is not None:
         inner_button = run_button_container.content
         inner_button.disabled = False
-        inner_button.text = "开始截取"
+        inner_button.content = ft.Text("开始截取", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.PLAY_ARROW_SOLID
         state.page.update()

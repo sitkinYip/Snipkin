@@ -87,7 +87,7 @@ def _make_styled_dropdown(
     value: str,
     options: list[str],
     width: int,
-    on_change: ft.ControlEvent | None = None,
+    on_select=None,
 ) -> ft.Dropdown:
     """
     创建统一风格的下拉选择框。
@@ -96,7 +96,7 @@ def _make_styled_dropdown(
         value:     初始选中值
         options:   选项列表
         width:     固定宽度
-        on_change: 值变化回调
+        on_select: 选中回调
 
     返回:
         风格化的 Dropdown 组件
@@ -105,7 +105,7 @@ def _make_styled_dropdown(
         value=value,
         width=width,
         options=[ft.dropdown.Option(option) for option in options],
-        on_change=on_change,
+        on_select=on_select,
         border_radius=ft.border_radius.all(10),
         border_color=DIVIDER_COLOR,
         focused_border_color=ACCENT_BLUE,
@@ -135,17 +135,32 @@ def build_clip_tab(state: AppState) -> ft.Container:
         on_output_file_picked,
     )
 
-    page = state.page
+    # ---- FilePicker 实例（Flet 0.82+ async API） ----
+    input_file_picker = ft.FilePicker()
+    output_file_picker = ft.FilePicker()
 
-    # ---- FilePicker 实例 ----
-    input_file_picker = ft.FilePicker(
-        on_result=lambda event: on_input_file_picked(event, state, input_path_field, output_path_field),
-    )
-    output_file_picker = ft.FilePicker(
-        on_result=lambda event: on_output_file_picked(event, state, output_path_field),
-    )
-    # FilePicker 必须添加到 page.overlay 中才能工作
-    page.overlay.extend([input_file_picker, output_file_picker])
+    async def pick_input_file(_event):
+        """异步选择输入视频文件"""
+        result = await input_file_picker.pick_files(
+            dialog_title="选择输入视频文件",
+            allowed_extensions=[
+                "mp4", "mov", "mkv", "avi", "flv",
+                "wmv", "webm", "ts", "m4v",
+            ],
+            allow_multiple=False,
+        )
+        on_input_file_picked(result, state, input_path_field, output_path_field)
+
+    async def pick_output_file(_event):
+        """异步选择输出文件保存路径"""
+        result = await output_file_picker.save_file(
+            dialog_title="选择输出文件保存位置",
+            file_type=ft.FilePickerFileType.CUSTOM,
+            allowed_extensions=[state.output_format],
+            file_name=output_path_field.value.split("/")[-1]
+            if output_path_field.value else None,
+        )
+        on_output_file_picked(result, state, output_path_field)
 
     # ---- 输入文件区域 ----
     input_path_field = _make_styled_textfield(
@@ -163,14 +178,7 @@ def build_clip_tab(state: AppState) -> ft.Container:
                 _build_action_button(
                     text="选择文件",
                     icon=ft.CupertinoIcons.DOC_ON_DOC,
-                    on_click=lambda _: input_file_picker.pick_files(
-                        dialog_title="选择输入视频文件",
-                        allowed_extensions=[
-                            "mp4", "mov", "mkv", "avi", "flv",
-                            "wmv", "webm", "ts", "m4v",
-                        ],
-                        allow_multiple=False,
-                    ),
+                    on_click=pick_input_file,
                 ),
             ],
             spacing=8,
@@ -202,7 +210,7 @@ def build_clip_tab(state: AppState) -> ft.Container:
         value=state.duration_unit,
         options=list(DURATION_UNITS.keys()),
         width=90,
-        on_change=lambda event: setattr(state, "duration_unit", event.control.value),
+        on_select=lambda event: setattr(state, "duration_unit", event.control.value),
     )
 
     time_section = _build_section_card(
@@ -258,7 +266,7 @@ def build_clip_tab(state: AppState) -> ft.Container:
         value=state.output_format,
         options=SUPPORTED_FORMATS,
         width=100,
-        on_change=lambda event: setattr(state, "output_format", event.control.value),
+        on_select=lambda event: setattr(state, "output_format", event.control.value),
     )
 
     output_path_field = _make_styled_textfield(
@@ -286,13 +294,7 @@ def build_clip_tab(state: AppState) -> ft.Container:
                         _build_action_button(
                             text="保存路径",
                             icon=ft.CupertinoIcons.FLOPPY_DISK,
-                            on_click=lambda _: output_file_picker.save_file(
-                                dialog_title="选择输出文件保存位置",
-                                file_type=ft.FilePickerFileType.CUSTOM,
-                                allowed_extensions=[state.output_format],
-                                file_name=output_path_field.value.split("/")[-1]
-                                if output_path_field.value else None,
-                            ),
+                            on_click=pick_output_file,
                         ),
                     ],
                     spacing=8,
@@ -357,7 +359,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         value=state.compress_quality,
         options=list(COMPRESS_QUALITY_PRESETS.keys()),
         width=200,
-        on_change=lambda event: setattr(state, "compress_quality", event.control.value),
+        on_select=lambda event: setattr(state, "compress_quality", event.control.value),
     )
 
     # 高级选项面板内容
@@ -365,7 +367,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         value=state.resolution,
         options=list(RESOLUTION_OPTIONS.keys()),
         width=140,
-        on_change=lambda event: setattr(state, "resolution", event.control.value),
+        on_select=lambda event: setattr(state, "resolution", event.control.value),
     )
     state.clip_resolution_dropdown = resolution_dropdown
 
@@ -373,7 +375,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         value=state.framerate,
         options=list(FRAMERATE_OPTIONS.keys()),
         width=120,
-        on_change=lambda event: setattr(state, "framerate", event.control.value),
+        on_select=lambda event: setattr(state, "framerate", event.control.value),
     )
     state.clip_framerate_dropdown = framerate_dropdown
 
@@ -381,7 +383,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         value=state.audio_bitrate,
         options=list(AUDIO_BITRATE_OPTIONS.keys()),
         width=160,
-        on_change=lambda event: setattr(state, "audio_bitrate", event.control.value),
+        on_select=lambda event: setattr(state, "audio_bitrate", event.control.value),
     )
     state.clip_audio_bitrate_dropdown = audio_bitrate_dropdown
 
@@ -503,7 +505,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
 
     compress_switch = ft.CupertinoSwitch(
         value=state.compress_enabled,
-        active_color=ACCENT_BLUE,
+        active_track_color=ACCENT_BLUE,
         on_change=toggle_compress,
     )
 
@@ -566,18 +568,14 @@ def _build_glow_run_button(
         带光效的按钮 Container 组件
     """
     button_content = ft.ElevatedButton(
-        text=text,
+        content=ft.Text(text, size=15, weight=ft.FontWeight.W_600),
         icon=icon,
         on_click=on_click,
+        bgcolor=ACCENT_BLUE,
+        color="#ffffff",
         style=ft.ButtonStyle(
-            bgcolor={
-                ft.ControlState.DEFAULT: ACCENT_BLUE,
-                ft.ControlState.HOVERED: ACCENT_BLUE_HOVER,
-            },
-            color={ft.ControlState.DEFAULT: "#ffffff"},
             shape=ft.RoundedRectangleBorder(radius=10),
             padding=ft.padding.symmetric(horizontal=24, vertical=14),
-            text_style=ft.TextStyle(size=15, weight=ft.FontWeight.W_600),
         ),
         height=46,
         width=float("inf"),

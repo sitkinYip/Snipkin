@@ -88,7 +88,7 @@ def _make_styled_dropdown(
     value: str,
     options: list[str],
     width: int,
-    on_change=None,
+    on_select=None,
 ) -> ft.Dropdown:
     """
     创建统一风格的 iOS 风格下拉选择框。
@@ -97,7 +97,7 @@ def _make_styled_dropdown(
         value:     初始选中值
         options:   选项列表
         width:     固定宽度
-        on_change: 值变化回调
+        on_select: 选中回调
 
     返回:
         风格化的 Dropdown 组件
@@ -106,7 +106,7 @@ def _make_styled_dropdown(
         value=value,
         width=width,
         options=[ft.dropdown.Option(option) for option in options],
-        on_change=on_change,
+        on_select=on_select,
         border_radius=ft.border_radius.all(10),
         border_color=DIVIDER_COLOR,
         focused_border_color=ACCENT_BLUE,
@@ -138,20 +138,32 @@ def build_concat_tab(state: AppState) -> ft.Container:
         handle_concat_run,
     )
 
-    page = state.page
+    # ---- FilePicker 实例（Flet 0.82+ async API） ----
+    concat_file_picker = ft.FilePicker()
+    concat_output_picker = ft.FilePicker()
 
-    # ---- FilePicker 实例 ----
-    concat_file_picker = ft.FilePicker(
-        on_result=lambda event: handle_concat_add_files_picked(
-            event, state, file_list_view, output_path_field,
-        ),
-    )
-    concat_output_picker = ft.FilePicker(
-        on_result=lambda event: handle_concat_output_picked(
-            event, state, output_path_field,
-        ),
-    )
-    page.overlay.extend([concat_file_picker, concat_output_picker])
+    async def pick_concat_files(_event):
+        """异步选择要拼接的视频文件（多选）"""
+        result = await concat_file_picker.pick_files(
+            dialog_title="选择要拼接的视频文件（可多选）",
+            allowed_extensions=[
+                "mp4", "mov", "mkv", "avi", "flv",
+                "wmv", "webm", "ts", "m4v",
+            ],
+            allow_multiple=True,
+        )
+        handle_concat_add_files_picked(result, state, file_list_view, output_path_field)
+
+    async def pick_concat_output(_event):
+        """异步选择拼接输出文件保存路径"""
+        result = await concat_output_picker.save_file(
+            dialog_title="选择拼接输出文件保存位置",
+            file_type=ft.FilePickerFileType.CUSTOM,
+            allowed_extensions=[state.concat_output_format],
+            file_name=output_path_field.value.split("/")[-1]
+            if output_path_field.value else None,
+        )
+        handle_concat_output_picked(result, state, output_path_field)
 
     # ---- 文件列表区域 ----
     file_list_view = ft.ListView(
@@ -172,7 +184,7 @@ def build_concat_tab(state: AppState) -> ft.Container:
         bgcolor=LOG_BACKGROUND_COLOR,
         border_radius=ft.border_radius.all(8),
         padding=ft.padding.all(24),
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment(0, 0),
     )
 
     file_list_container = ft.Container(
@@ -198,14 +210,7 @@ def build_concat_tab(state: AppState) -> ft.Container:
                         _build_action_button(
                             text="添加文件",
                             icon=ft.CupertinoIcons.PLUS,
-                            on_click=lambda _: concat_file_picker.pick_files(
-                                dialog_title="选择要拼接的视频文件（可多选）",
-                                allowed_extensions=[
-                                    "mp4", "mov", "mkv", "avi", "flv",
-                                    "wmv", "webm", "ts", "m4v",
-                                ],
-                                allow_multiple=True,
-                            ),
+                            on_click=pick_concat_files,
                         ),
                         _build_action_button(
                             text="上移",
@@ -244,7 +249,7 @@ def build_concat_tab(state: AppState) -> ft.Container:
         value=state.concat_transition,
         options=list(XFADE_TRANSITIONS.keys()),
         width=220,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_transition", event.control.value,
         ),
     )
@@ -283,7 +288,7 @@ def build_concat_tab(state: AppState) -> ft.Container:
         value=state.concat_output_format,
         options=CONCAT_SUPPORTED_FORMATS,
         width=100,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_output_format", event.control.value,
         ),
     )
@@ -317,13 +322,7 @@ def build_concat_tab(state: AppState) -> ft.Container:
                         _build_action_button(
                             text="保存路径",
                             icon=ft.CupertinoIcons.FLOPPY_DISK,
-                            on_click=lambda _: concat_output_picker.save_file(
-                                dialog_title="选择拼接输出文件保存位置",
-                                file_type=ft.FilePickerFileType.CUSTOM,
-                                allowed_extensions=[state.concat_output_format],
-                                file_name=output_path_field.value.split("/")[-1]
-                                if output_path_field.value else None,
-                            ),
+                            on_click=pick_concat_output,
                         ),
                     ],
                     spacing=8,
@@ -375,7 +374,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         value=state.concat_compress_quality,
         options=list(COMPRESS_QUALITY_PRESETS.keys()),
         width=200,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_compress_quality", event.control.value,
         ),
     )
@@ -385,7 +384,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         value=state.concat_resolution,
         options=list(RESOLUTION_OPTIONS.keys()),
         width=140,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_resolution", event.control.value,
         ),
     )
@@ -395,7 +394,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         value=state.concat_framerate,
         options=list(FRAMERATE_OPTIONS.keys()),
         width=120,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_framerate", event.control.value,
         ),
     )
@@ -405,7 +404,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         value=state.concat_audio_bitrate,
         options=list(AUDIO_BITRATE_OPTIONS.keys()),
         width=160,
-        on_change=lambda event: setattr(
+        on_select=lambda event: setattr(
             state, "concat_audio_bitrate", event.control.value,
         ),
     )
@@ -526,7 +525,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
 
     compress_switch = ft.CupertinoSwitch(
         value=state.concat_compress_enabled,
-        active_color=ACCENT_BLUE,
+        active_track_color=ACCENT_BLUE,
         on_change=toggle_compress,
     )
 
