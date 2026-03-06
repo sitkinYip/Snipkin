@@ -120,6 +120,42 @@ def format_seconds_to_timecode(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 
+def get_video_resolution(file_path: str) -> tuple[int, int] | None:
+    """
+    使用 ffprobe 获取视频文件的分辨率（宽 × 高）。
+
+    通过调用 ffprobe 命令读取视频流的 width 和 height 字段。
+    主要用于拼接模式中 xfade 过渡前统一各视频的分辨率。
+
+    参数:
+        file_path: 视频文件的绝对路径
+
+    返回:
+        (width, height) 元组，获取失败时返回 None
+    """
+    try:
+        result = subprocess.run(
+            [
+                get_executable_path("ffprobe"),
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=s=x:p=0",
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split("x")
+            if len(parts) == 2:
+                return int(parts[0]), int(parts[1])
+    except Exception:
+        pass
+    return None
+
+
 def get_video_duration(file_path: str) -> float | None:
     """
     使用 ffprobe 获取视频文件的时长。

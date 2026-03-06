@@ -1,48 +1,38 @@
 """
-snipkin.handlers.clip_handler - 视频截取的业务逻辑处理
+snipkin.handlers.clip_handler - 视频截取的 UI 事件处理层
 
-本模块定义 ClipHandlerMixin 类，以 Mixin 模式提供视频截取功能的所有业务逻辑，包括：
-- 输入文件选择事件处理
+本模块定义 ClipHandlerMixin 类，以 Mixin 模式提供视频截取功能的 UI 事件处理，包括：
+- 输入文件选择事件处理（弹出对话框、更新 UI 状态）
 - 输出路径选择事件处理
-- 截取参数校验（文件存在性、时间格式、路径合法性等）
-- ffmpeg 截取命令构建（支持流复制 / 压缩转码 / GIF 导出）
-- 视频滤镜构建（分辨率缩放 + 帧率限制）
-- ffmpeg 命令的子线程执行与结果回调
+- "开始截取"按钮点击：从 UI 收集参数 → 调用 core 层校验与构建 → 子线程执行
 
 设计说明：
-  本模块不包含任何 UI 构建代码，仅处理业务逻辑。
-  通过 self 访问主窗口的状态变量和 UI 组件（由 VideoClipperApp 初始化）。
-  ffmpeg 命令在子线程中执行，通过 _log_threadsafe 安全写入日志。
+  本模块是 UI 框架（CustomTkinter）与核心逻辑（snipkin.core.clip_core）之间的桥梁。
+  核心的参数校验、ffmpeg 命令构建、命令执行逻辑已抽取到 snipkin.core.clip_core 中，
+  本模块仅负责：
+    1. 从 UI 组件（StringVar / BooleanVar）收集参数值
+    2. 调用 core 层的纯函数
+    3. 将结果反馈到 UI（日志、按钮状态等）
 """
 
-import datetime
 import os
-import subprocess
 import threading
 from tkinter import filedialog
 
-from snipkin.constants import (
-    AUDIO_BITRATE_OPTIONS,
-    COMPRESS_QUALITY_PRESETS,
-    DURATION_UNITS,
-    FORMATS_REQUIRING_TRANSCODE,
-    FRAMERATE_OPTIONS,
-    RESOLUTION_OPTIONS,
-    VIDEO_FILE_TYPES,
+from snipkin.constants import VIDEO_FILE_TYPES
+from snipkin.core.clip_core import (
+    build_clip_ffmpeg_command,
+    execute_ffmpeg,
+    generate_clip_output_path,
+    validate_clip_params,
 )
-from snipkin.utils import (
-    check_ffmpeg_available,
-    format_seconds_to_timecode,
-    get_executable_path,
-    parse_timecode_to_seconds,
-)
-
 
 class ClipHandlerMixin:
     """
-    视频截取的业务逻辑 Mixin。
+    视频截取的 UI 事件处理 Mixin。
 
-    提供截取功能的事件处理、参数校验、ffmpeg 命令构建与执行方法。
+    作为 UI 层与 core 层之间的桥梁，负责从 UI 收集参数、
+    调用 core 层纯函数、并将结果反馈到 UI。
     混入 VideoClipperApp 后，通过 self 访问主窗口实例的属性和方法。
     """
 
@@ -56,7 +46,7 @@ class ClipHandlerMixin:
 
         弹出文件选择对话框，选择输入视频文件后：
           1. 更新输入文件路径显示
-          2. 自动根据输入文件名和当前时间戳生成默认输出路径
+          2. 调用 core 层生成默认输出路径
           3. 在日志中记录操作
         """
         file_path = filedialog.askopenfilename(
@@ -67,14 +57,9 @@ class ClipHandlerMixin:
             self.input_file_path.set(file_path)
             self._log(f"已选择输入文件: {file_path}")
 
-            # 自动根据输入文件名生成默认输出路径
-            directory = os.path.dirname(file_path)
-            basename = os.path.splitext(os.path.basename(file_path))[0]
+            # 调用 core 层生成默认输出路径
             output_format = self.output_format_var.get()
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            default_output = os.path.join(
-                directory, f"{basename}_clip_{timestamp}.{output_format}",
-            )
+            default_output = generate_clip_output_path(file_path, output_format)
             self.output_file_path.set(default_output)
 
     def _on_select_output_file(self):
@@ -107,79 +92,48 @@ class ClipHandlerMixin:
         处理"开始截取"按钮点击事件。
 
         执行流程：
-          1. 校验 ffmpeg 可用性
-          2. 校验输入文件存在性
-          3. 校验并创建输出目录
-          4. 解析开始时间和结束时间/持续时长
-          5. 构建 ffmpeg 命令
-          6. 在子线程中执行命令
+          1. 从 UI 收集所有参数值
+          2. 调用 core 层校验参数
+          3. 调用 core 层构建 ffmpeg 命令
+          4. 在子线程中调用 core 层执行命令
         """
-        # ---- 参数校验 ----
-        if not check_ffmpeg_available():
-            self._log("❌ 错误: 未检测到 ffmpeg，请先安装。")
-            return
-
+        # ---- 从 UI 收集参数 ----
         input_path = self.input_file_path.get().strip()
-        if not input_path or not os.path.isfile(input_path):
-            self._log("❌ 错误: 请先选择一个有效的输入视频文件。")
-            return
-
         output_path = self.output_file_path.get().strip()
-        if not output_path:
-            self._log("❌ 错误: 请先设置输出文件保存路径。")
-            return
+        start_time = self.start_time_var.get()
+        end_time = self.end_time_var.get()
+        duration_value = self.duration_value_var.get()
+        duration_unit = self.duration_unit_var.get()
 
-        # 自动创建不存在的输出目录
-        out_dir = os.path.dirname(output_path)
-        if out_dir and not os.path.exists(out_dir):
-            try:
-                os.makedirs(out_dir, exist_ok=True)
-                self._log(f"已自动创建输出文件夹: {out_dir}")
-            except Exception as error:
-                self._log(f"❌ 错误: 无法创建输出文件夹: {error}")
-                return
-
-        # 解析开始时间（支持 H:MM:SS / MM:SS / 秒数 格式）
-        try:
-            start_seconds = parse_timecode_to_seconds(self.start_time_var.get())
-            if start_seconds < 0:
-                raise ValueError("开始时间不能为负数")
-        except ValueError as error:
-            self._log(f"❌ 错误: 开始时间格式无效（支持 H:MM:SS / MM:SS / 秒数）。{error}")
-            return
-
-        # 优先使用结束时间，否则使用持续时长
-        end_time_text = self.end_time_var.get().strip()
-        if end_time_text:
-            # 用户填写了结束时间，计算持续时长
-            try:
-                end_seconds = parse_timecode_to_seconds(end_time_text)
-                if end_seconds <= start_seconds:
-                    self._log("❌ 错误: 结束时间必须大于开始时间。")
-                    return
-                duration_seconds = end_seconds - start_seconds
-            except ValueError as error:
-                self._log(f"❌ 错误: 结束时间格式无效。{error}")
-                return
-        else:
-            # 使用持续时长
-            try:
-                duration_value = float(self.duration_value_var.get())
-                if duration_value <= 0:
-                    raise ValueError("持续时长必须大于 0")
-            except ValueError:
-                self._log("❌ 错误: 持续时长必须是一个正数。")
-                return
-
-            unit_multiplier = DURATION_UNITS[self.duration_unit_var.get()]
-            duration_seconds = duration_value * unit_multiplier
-
-        # ---- 构建 ffmpeg 命令 ----
-        command = self._build_clip_ffmpeg_command(
+        # ---- 调用 core 层校验参数 ----
+        params, error = validate_clip_params(
             input_path=input_path,
             output_path=output_path,
-            start_seconds=start_seconds,
-            duration_seconds=duration_seconds,
+            start_time=start_time,
+            end_time=end_time,
+            duration_value=duration_value,
+            duration_unit=duration_unit,
+        )
+        if error:
+            self._log(error)
+            return
+
+        # 如果自动创建了输出目录，记录日志
+        if params["output_dir_created"]:
+            self._log(f"已自动创建输出文件夹: {params['output_dir_created']}")
+
+        # ---- 调用 core 层构建 ffmpeg 命令 ----
+        command = build_clip_ffmpeg_command(
+            input_path=input_path,
+            output_path=output_path,
+            start_seconds=params["start_seconds"],
+            duration_seconds=params["duration_seconds"],
+            output_format=self.output_format_var.get(),
+            compress_enabled=self.compress_enabled_var.get(),
+            quality_preset=self.compress_quality_var.get(),
+            resolution=self.resolution_var.get(),
+            framerate=self.framerate_var.get(),
+            audio_bitrate=self.audio_bitrate_var.get(),
         )
 
         self._log(f"▶ 执行命令: {' '.join(command)}")
@@ -187,146 +141,35 @@ class ClipHandlerMixin:
         # 禁用按钮，防止重复点击
         self.run_button.configure(state="disabled", text="⏳ 处理中...")
 
-        # 在子线程中执行 ffmpeg
+        # ---- 在子线程中调用 core 层执行命令 ----
         thread = threading.Thread(
-            target=self._execute_ffmpeg, args=(command,), daemon=True,
+            target=self._run_clip_ffmpeg_in_thread,
+            args=(command, output_path),
+            daemon=True,
         )
         thread.start()
 
-    # ============================================================
-    # 截取核心逻辑
-    # ============================================================
-
-    def _build_clip_ffmpeg_command(
-        self,
-        input_path: str,
-        output_path: str,
-        start_seconds: float,
-        duration_seconds: float,
-    ) -> list[str]:
+    def _run_clip_ffmpeg_in_thread(self, command: list[str], output_path: str):
         """
-        构建视频截取的 ffmpeg 命令。
+        在子线程中执行截取 ffmpeg 命令。
 
-        根据用户选择的压缩设置和输出格式，决定使用以下策略之一：
-          - 需要转码的格式（如 GIF）：强制使用转码
-          - 启用压缩：使用 libx264 编码 + CRF 质量控制 + 可选滤镜
-          - 不压缩：使用流复制（-c copy），速度最快，无质量损失
+        通过回调函数将 core 层的执行结果安全地反馈到 UI 层。
 
         参数:
-            input_path:       输入视频文件路径
-            output_path:      输出文件路径
-            start_seconds:    截取开始时间（秒）
-            duration_seconds: 截取持续时长（秒）
-
-        返回:
-            完整的 ffmpeg 命令参数列表
+            command:     完整的 ffmpeg 命令参数列表
+            output_path: 输出文件路径（用于成功日志）
         """
-        start_timecode = format_seconds_to_timecode(start_seconds)
-        duration_timecode = format_seconds_to_timecode(duration_seconds)
-
-        command = [
-            get_executable_path("ffmpeg"), "-y",
-            "-ss", start_timecode,
-            "-i", input_path,
-            "-t", duration_timecode,
-        ]
-
-        output_format = self.output_format_var.get()
-        needs_transcode = output_format in FORMATS_REQUIRING_TRANSCODE
-        compress_enabled = self.compress_enabled_var.get()
-
-        if needs_transcode or compress_enabled:
-            # 需要转码：添加编码参数
-            if output_format != "gif":
-                crf_value = COMPRESS_QUALITY_PRESETS[self.compress_quality_var.get()]
-                command.extend([
-                    "-c:v", "libx264",
-                    "-crf", str(crf_value),
-                    "-preset", "medium",
-                ])
-
-            # 添加视频滤镜（分辨率缩放 + 帧率限制）
-            video_filters = self._build_video_filters()
-            if video_filters:
-                command.extend(["-vf", ",".join(video_filters)])
-
-            # 音频码率设置
-            audio_bitrate = AUDIO_BITRATE_OPTIONS[self.audio_bitrate_var.get()]
-            if audio_bitrate:
-                command.extend(["-b:a", audio_bitrate])
-            else:
-                command.extend(["-c:a", "aac"])
-        else:
-            # 不压缩：流复制（速度最快，无质量损失）
-            command.extend(["-c", "copy"])
-
-        command.append(output_path)
-        return command
-
-    def _build_video_filters(self) -> list[str]:
-        """
-        根据高级选项构建视频滤镜列表。
-
-        支持的滤镜：
-          - scale: 分辨率缩放（如 1920:-1 表示宽度 1920，高度按比例自适应）
-          - fps:   帧率限制（如 fps=30 表示限制为 30fps）
-
-        多个滤镜可以叠加使用，通过逗号连接传给 ffmpeg 的 -vf 参数。
-
-        返回:
-            滤镜字符串列表，为空表示不需要额外滤镜
-        """
-        filters = []
-
-        # 分辨率缩放
-        scale_value = RESOLUTION_OPTIONS[self.resolution_var.get()]
-        if scale_value:
-            filters.append(f"scale={scale_value}")
-
-        # 帧率限制
-        fps_value = FRAMERATE_OPTIONS[self.framerate_var.get()]
-        if fps_value:
-            filters.append(f"fps={fps_value}")
-
-        return filters
-
-    def _execute_ffmpeg(self, command: list[str]):
-        """
-        在子线程中执行 ffmpeg 命令。
-
-        执行完成后通过 _log_threadsafe 将结果写入日志，
-        并通过 after(0, callback) 在主线程中恢复按钮状态。
-
-        参数:
-            command: 完整的 ffmpeg 命令参数列表
-        """
-        try:
-            process = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=600,  # 最长等待 10 分钟
-            )
-
-            if process.returncode == 0:
-                output_path = self.output_file_path.get()
-                self._log_threadsafe(f"✅ 截取成功！输出文件: {output_path}")
-            else:
-                # ffmpeg 的错误信息通常输出到 stderr
-                error_message = process.stderr.strip() if process.stderr else "未知错误"
-                self._log_threadsafe(
-                    f"❌ ffmpeg 执行失败 (返回码 {process.returncode}):\n{error_message}",
-                )
-
-        except subprocess.TimeoutExpired:
-            self._log_threadsafe("❌ 错误: ffmpeg 执行超时（超过 10 分钟），已终止。")
-        except FileNotFoundError:
-            self._log_threadsafe("❌ 错误: 无法找到 ffmpeg 可执行文件。")
-        except Exception as unexpected_error:
-            self._log_threadsafe(f"❌ 发生意外错误: {unexpected_error}")
-        finally:
-            # 恢复按钮状态（必须在主线程中操作 UI）
-            self.after(
+        execute_ffmpeg(
+            command=command,
+            on_log=self._log_threadsafe,
+            on_success=lambda: self._log_threadsafe(
+                f"✅ 截取成功！输出文件: {output_path}",
+            ),
+            on_error=self._log_threadsafe,
+            on_complete=lambda: self.after(
                 0,
-                lambda: self.run_button.configure(state="normal", text="🚀 开始截取"),
-            )
+                lambda: self.run_button.configure(
+                    state="normal", text="🚀 开始截取",
+                ),
+            ),
+        )
