@@ -6,4 +6,4 @@ Snipkin - 跨平台视频处理工具包
 支持 macOS / Windows / Linux。
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
