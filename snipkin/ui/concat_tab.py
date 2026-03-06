@@ -152,7 +152,8 @@ def build_concat_tab(state: AppState) -> ft.Container:
             ],
             allow_multiple=True,
         )
-        handle_concat_add_files_picked(result, state, file_list_view, output_path_field)
+        if result:
+            handle_concat_add_files_picked(result, state, file_list_view, output_path_field)
 
     async def pick_concat_output(_event):
         """异步选择拼接输出文件保存路径"""
@@ -163,7 +164,8 @@ def build_concat_tab(state: AppState) -> ft.Container:
             file_name=output_path_field.value.split("/")[-1]
             if output_path_field.value else None,
         )
-        handle_concat_output_picked(result, state, output_path_field)
+        if result:
+            handle_concat_output_picked(result, state, output_path_field)
 
     # ---- 文件列表区域 ----
     file_list_view = ft.ListView(
@@ -348,12 +350,12 @@ def build_concat_tab(state: AppState) -> ft.Container:
                 transition_section,
                 compress_section,
                 output_section,
-                ft.Container(content=run_button, padding=ft.padding.only(top=4)),
+                ft.Container(content=run_button, padding=ft.padding.only(top=2)),
             ],
-            spacing=10,
+            spacing=8,
             scroll=ft.ScrollMode.AUTO,
         ),
-        padding=ft.padding.only(top=12),
+        padding=ft.padding.only(top=8),
         expand=True,
     )
 
@@ -457,7 +459,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         """切换高级选项面板的展开/收起状态"""
         state.concat_advanced_visible = not state.concat_advanced_visible
         if state.concat_advanced_visible:
-            advanced_container.height = 90
+            advanced_container.height = 110
             advanced_container.opacity = 1
             advanced_toggle_icon.rotate = ft.Rotate(1.5708)
         else:

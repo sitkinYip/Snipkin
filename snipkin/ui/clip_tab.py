@@ -149,7 +149,8 @@ def build_clip_tab(state: AppState) -> ft.Container:
             ],
             allow_multiple=False,
         )
-        on_input_file_picked(result, state, input_path_field, output_path_field)
+        if result:
+            on_input_file_picked(result, state, input_path_field, output_path_field)
 
     async def pick_output_file(_event):
         """异步选择输出文件保存路径"""
@@ -160,7 +161,8 @@ def build_clip_tab(state: AppState) -> ft.Container:
             file_name=output_path_field.value.split("/")[-1]
             if output_path_field.value else None,
         )
-        on_output_file_picked(result, state, output_path_field)
+        if result:
+            on_output_file_picked(result, state, output_path_field)
 
     # ---- 输入文件区域 ----
     input_path_field = _make_styled_textfield(
@@ -328,12 +330,12 @@ def build_clip_tab(state: AppState) -> ft.Container:
                 time_section,
                 compress_section,
                 output_section,
-                ft.Container(content=run_button, padding=ft.padding.only(top=4)),
+                ft.Container(content=run_button, padding=ft.padding.only(top=2)),
             ],
-            spacing=10,
+            spacing=8,
             scroll=ft.ScrollMode.AUTO,
         ),
-        padding=ft.padding.only(top=12),
+        padding=ft.padding.only(top=8),
         expand=True,
     )
 
@@ -435,7 +437,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         """切换高级选项面板的展开/收起状态"""
         state.advanced_visible = not state.advanced_visible
         if state.advanced_visible:
-            advanced_container.height = 90
+            advanced_container.height = 110
             advanced_container.opacity = 1
             advanced_toggle_icon.rotate = ft.Rotate(1.5708)
         else:

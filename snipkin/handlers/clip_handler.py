@@ -113,29 +113,6 @@ def on_output_file_picked(
         _log(state, f"输出路径已设置: {result}")
         state.page.update()
 
-
-def on_output_file_picked(
-    event: ft.FilePickerResultEvent,
-    state: AppState,
-    output_path_field: ft.TextField,
-) -> None:
-    """
-    处理输出路径选择完成后的回调。
-
-    选择保存路径后更新输出文件路径显示和 state 中的值。
-
-    参数:
-        event:             FilePicker 结果事件
-        state:             应用状态实例
-        output_path_field: 输出文件路径 TextField 控件
-    """
-    if event.path:
-        state.output_file_path = event.path
-        output_path_field.value = event.path
-        _log(state, f"输出路径已设置: {event.path}")
-        state.page.update()
-
-
 def handle_clip_run(state: AppState) -> None:
     """
     处理"开始截取"按钮点击事件。
@@ -168,6 +145,7 @@ def handle_clip_run(state: AppState) -> None:
     )
     if error:
         _log(state, error)
+        _show_snackbar(state, error.replace("❌ 错误: ", ""), "#FF3B30")
         return
 
     # 如果自动创建了输出目录，记录日志
@@ -208,6 +186,25 @@ def handle_clip_run(state: AppState) -> None:
     thread.start()
 
 
+def _show_snackbar(state: AppState, message: str, color: str) -> None:
+    """
+    通过 page.overlay 显示 SnackBar 通知。
+
+    参数:
+        state:   应用状态实例
+        message: 通知消息文本
+        color:   SnackBar 背景色
+    """
+    if state.page is not None:
+        snackbar = ft.SnackBar(
+            content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
+            bgcolor=color,
+            duration=3000,
+            open=True,
+        )
+        state.page.overlay.append(snackbar)
+        state.page.update()
+
 def _run_clip_ffmpeg_in_thread(
     state: AppState,
     command: list[str],
@@ -217,18 +214,26 @@ def _run_clip_ffmpeg_in_thread(
     在子线程中执行截取 ffmpeg 命令。
 
     通过回调函数将 core 层的执行结果安全地反馈到 UI 层。
-    使用 page.run_thread 确保 UI 更新在主线程中执行。
+    成功或失败时通过 SnackBar 通知用户。
 
     参数:
         state:       应用状态实例
         command:     完整的 ffmpeg 命令参数列表
         output_path: 输出文件路径（用于成功日志）
     """
+    def on_success():
+        _log(state, f"截取成功！输出文件: {output_path}")
+        _show_snackbar(state, f"✅ 截取成功！文件已保存", "#34C759")
+
+    def on_error(message):
+        _log(state, message)
+        _show_snackbar(state, f"❌ 截取失败，请展开日志查看详情", "#FF3B30")
+
     execute_ffmpeg(
         command=command,
         on_log=lambda message: _log(state, message),
-        on_success=lambda: _log(state, f"截取成功！输出文件: {output_path}"),
-        on_error=lambda message: _log(state, message),
+        on_success=on_success,
+        on_error=on_error,
         on_complete=lambda: _restore_clip_run_button(state),
     )
 

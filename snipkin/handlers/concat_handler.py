@@ -270,6 +270,7 @@ def handle_concat_run(state: AppState) -> None:
     )
     if error:
         _log(state, error)
+        _show_snackbar(state, error.replace("❌ 错误: ", ""), "#FF3B30")
         return
 
     if params["output_dir_created"]:
@@ -317,6 +318,25 @@ def handle_concat_run(state: AppState) -> None:
     thread.start()
 
 
+def _show_snackbar(state: AppState, message: str, color: str) -> None:
+    """
+    通过 page.overlay 显示 SnackBar 通知。
+
+    参数:
+        state:   应用状态实例
+        message: 通知消息文本
+        color:   SnackBar 背景色
+    """
+    if state.page is not None:
+        snackbar = ft.SnackBar(
+            content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
+            bgcolor=color,
+            duration=3000,
+            open=True,
+        )
+        state.page.overlay.append(snackbar)
+        state.page.update()
+
 def _run_concat_ffmpeg_in_thread(
     state: AppState,
     command: list[str],
@@ -327,6 +347,7 @@ def _run_concat_ffmpeg_in_thread(
     在子线程中执行拼接 ffmpeg 命令。
 
     通过回调函数将 core 层的执行结果反馈到 UI 层。
+    成功或失败时通过 SnackBar 通知用户。
 
     参数:
         state:          应用状态实例
@@ -334,11 +355,19 @@ def _run_concat_ffmpeg_in_thread(
         output_path:    输出文件路径（用于成功日志）
         temp_file_path: concat demuxer 模式的临时文件路径（可选，用于清理）
     """
+    def on_success():
+        _log(state, f"拼接成功！输出文件: {output_path}")
+        _show_snackbar(state, f"✅ 拼接成功！文件已保存", "#34C759")
+
+    def on_error(message):
+        _log(state, message)
+        _show_snackbar(state, f"❌ 拼接失败，请展开日志查看详情", "#FF3B30")
+
     execute_concat_ffmpeg(
         command=command,
         on_log=lambda message: _log(state, message),
-        on_success=lambda: _log(state, f"拼接成功！输出文件: {output_path}"),
-        on_error=lambda message: _log(state, message),
+        on_success=on_success,
+        on_error=on_error,
         on_complete=lambda: _restore_concat_run_button(state),
         temp_file_path=temp_file_path,
     )

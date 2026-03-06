@@ -135,9 +135,10 @@ def build_app(page: ft.Page) -> None:
     page.title = "Snipkin - 视频处理工具"
     page.window.width = 700
     page.window.height = 820
-    page.window.resizable = False
+    page.window.resizable = True
     page.bgcolor = ft.Colors.TRANSPARENT
     page.padding = 0
+    page.assets_dir = "assets"
     page.theme_mode = ft.ThemeMode.DARK
     page.theme = ft.Theme(
         color_scheme_seed=ACCENT_BLUE,
@@ -152,22 +153,25 @@ def build_app(page: ft.Page) -> None:
 
     # ---- 启动时检测 ffmpeg ----
     if not check_ffmpeg_available():
-        page.open(
-            ft.AlertDialog(
-                title=ft.Text("ffmpeg 未找到"),
-                content=ft.Text(
-                    "未在系统 PATH 中检测到 ffmpeg。\n"
-                    "请先安装 ffmpeg（推荐使用 Homebrew: brew install ffmpeg），"
-                    "然后重新启动本工具。",
-                ),
-                actions=[
-                    ft.TextButton(
-                        content=ft.Text("知道了"),
-                        on_click=lambda event: page.close(event.control.parent),
-                    ),
-                ],
+        ffmpeg_dialog = ft.AlertDialog(
+            title=ft.Text("ffmpeg 未找到"),
+            content=ft.Text(
+                "未在系统 PATH 中检测到 ffmpeg。\n"
+                "请先安装 ffmpeg（推荐使用 Homebrew: brew install ffmpeg），"
+                "然后重新启动本工具。",
             ),
+            open=True,
         )
+
+        def close_dialog(_event):
+            ffmpeg_dialog.open = False
+            page.update()
+
+        ffmpeg_dialog.actions = [
+            ft.TextButton(content=ft.Text("知道了"), on_click=close_dialog),
+        ]
+        page.overlay.append(ffmpeg_dialog)
+        page.update()
 
 
 def _build_root_layout(state: AppState) -> ft.Stack:
@@ -244,10 +248,10 @@ def _build_content(state: AppState) -> ft.Column:
     title_bar = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Icon(
-                    ft.CupertinoIcons.FILM,
-                    color=ACCENT_BLUE,
-                    size=24,
+                ft.Image(
+                    src="icon.png",
+                    width=24,
+                    height=24,
                 ),
                 ft.Text(
                     "Snipkin",
@@ -264,7 +268,7 @@ def _build_content(state: AppState) -> ft.Column:
             spacing=8,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.padding.only(bottom=12),
+        padding=ft.padding.only(bottom=6),
     )
 
     # ---- Tabs（Segmented Control 风格） ----
@@ -275,8 +279,14 @@ def _build_content(state: AppState) -> ft.Column:
 
     tab_bar = ft.TabBar(
         tabs=[
-            ft.Tab(label="✂️ 视频截取"),
-            ft.Tab(label="🔗 视频拼接"),
+            ft.Tab(
+                label="视频截取",
+                icon=ft.CupertinoIcons.SCISSORS,
+            ),
+            ft.Tab(
+                label="视频拼接",
+                icon=ft.CupertinoIcons.LINK,
+            ),
         ],
         indicator_color=TAB_INDICATOR_COLOR,
         label_color=TEXT_PRIMARY_COLOR,
@@ -327,12 +337,61 @@ def _build_content(state: AppState) -> ft.Column:
 # 日志区域
 # ============================================================
 
+def _show_page_snackbar(page: ft.Page, message: str, color: str) -> None:
+    """
+    通过 page.overlay 显示 SnackBar 通知。
+
+    参数:
+        page:    Flet Page 实例
+        message: 通知消息文本
+        color:   SnackBar 背景色
+    """
+    snackbar = ft.SnackBar(
+        content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
+        bgcolor=color,
+        duration=3000,
+        open=True,
+    )
+    page.overlay.append(snackbar)
+    page.update()
+
+def _copy_all_logs(state: AppState, log_list_view: ft.ListView) -> None:
+    """
+    将日志 ListView 中的所有文本复制到系统剪贴板。
+
+    遍历 ListView 中的所有 Text 控件，拼接为完整文本后写入剪贴板，
+    并通过 SnackBar 通知用户复制结果。
+
+    参数:
+        state:         应用状态实例
+        log_list_view: 日志 ListView 控件引用
+    """
+    log_lines = []
+    for control in log_list_view.controls:
+        if isinstance(control, ft.Text) and control.value:
+            log_lines.append(control.value)
+
+    if not log_lines:
+        _show_page_snackbar(state.page, "暂无日志内容", "#636366")
+        return
+
+    full_log_text = "\n".join(log_lines)
+    state.page.clipboard = full_log_text
+    _show_page_snackbar(
+        state.page,
+        f"已复制 {len(log_lines)} 条日志到剪贴板",
+        "#34C759",
+    )
+
 def _build_log_section(state: AppState) -> ft.Container:
     """
-    构建底部日志输出区域。
+    构建底部日志输出区域，支持折叠/展开和拖拽调整高度。
 
-    包含标题行和一个只读的多行文本框，用于显示操作日志和 ffmpeg 执行结果。
-    两个 Tab 共享同一个日志区域。
+    功能：
+      - 点击标题栏可折叠/展开日志内容
+      - 顶部拖拽手柄可上下拖动调整日志区高度
+      - 折叠时仅显示标题栏，展开时显示日志内容
+      - 两个 Tab 共享同一个日志区域
 
     参数:
         state: 应用状态实例
@@ -340,10 +399,16 @@ def _build_log_section(state: AppState) -> ft.Container:
     返回:
         日志区域的 Container 组件
     """
+    # 日志面板状态（默认收起，需要时手动展开）
+    log_expanded = False
+    log_panel_height = 100
+    min_log_height = 60
+    max_log_height = 400
+
     log_list_view = ft.ListView(
-        height=120,
+        height=log_panel_height,
         spacing=2,
-        padding=ft.padding.all(10),
+        padding=ft.padding.all(8),
         auto_scroll=True,
     )
 
@@ -354,33 +419,138 @@ def _build_log_section(state: AppState) -> ft.Container:
         border=ft.border.all(1, ft.Colors.with_opacity(0.15, "#ffffff")),
     )
 
+    # 日志内容区域（默认收起）
+    log_body = ft.Container(
+        content=log_container,
+        height=0,
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
+        animate_size=ft.Animation(duration=250, curve=ft.AnimationCurve.EASE_IN_OUT),
+        animate_opacity=ft.Animation(duration=250, curve=ft.AnimationCurve.EASE_IN_OUT),
+        opacity=0,
+    )
+
     # 将日志控件引用存储到 state 中，供 handler 层写入日志
     state.log_text = log_list_view
+
+    # 折叠/展开箭头图标（默认收起状态，箭头朝上表示可展开）
+    toggle_icon = ft.Icon(
+        ft.CupertinoIcons.CHEVRON_DOWN,
+        size=14,
+        color=TEXT_SECONDARY_COLOR,
+        rotate=ft.Rotate(3.14159),
+        animate_rotation=ft.Animation(duration=250, curve=ft.AnimationCurve.EASE_IN_OUT),
+    )
+
+    def toggle_log_panel(_event):
+        """切换日志面板的折叠/展开状态"""
+        nonlocal log_expanded
+        log_expanded = not log_expanded
+        if log_expanded:
+            log_body.height = log_list_view.height + 16
+            log_body.opacity = 1
+            toggle_icon.rotate = ft.Rotate(0)
+        else:
+            log_body.height = 0
+            log_body.opacity = 0
+            toggle_icon.rotate = ft.Rotate(3.14159)
+        state.page.update()
+
+    # 拖拽手柄（位于日志区顶部，可上下拖动调整高度）
+    def on_drag_start(_event):
+        """拖拽开始时禁用动画，避免动画与频繁更新冲突"""
+        log_body.animate_size = None
+
+    def on_drag_update(event: ft.DragUpdateEvent):
+        """拖拽手柄时动态调整日志区高度"""
+        nonlocal log_panel_height
+        if not log_expanded:
+            return
+        new_height = log_panel_height - event.local_delta.y
+        new_height = max(min_log_height, min(max_log_height, new_height))
+        log_panel_height = new_height
+        log_list_view.height = log_panel_height
+        log_body.height = log_panel_height + 16
+        log_body.update()
+
+    def on_drag_end(_event):
+        """拖拽结束后恢复动画"""
+        log_body.animate_size = ft.Animation(
+            duration=250, curve=ft.AnimationCurve.EASE_IN_OUT,
+        )
+
+    drag_handle = ft.GestureDetector(
+        content=ft.Container(
+            content=ft.Container(
+                width=36,
+                height=4,
+                border_radius=ft.border_radius.all(2),
+                bgcolor=ft.Colors.with_opacity(0.3, "#ffffff"),
+            ),
+            alignment=ft.Alignment(0, 0),
+            height=14,
+        ),
+        mouse_cursor=ft.MouseCursor.RESIZE_ROW,
+        drag_interval=50,
+        on_vertical_drag_start=on_drag_start,
+        on_vertical_drag_update=on_drag_update,
+        on_vertical_drag_end=on_drag_end,
+    )
+
+    # 复制日志按钮（仅展开时显示）
+    copy_button = ft.IconButton(
+        icon=ft.CupertinoIcons.DOC_ON_CLIPBOARD,
+        icon_size=14,
+        icon_color=TEXT_SECONDARY_COLOR,
+        tooltip="复制全部日志",
+        visible=False,
+        style=ft.ButtonStyle(padding=ft.padding.all(4)),
+        on_click=lambda _: _copy_all_logs(state, log_list_view),
+    )
+
+    def toggle_log_panel_with_copy(_event):
+        """切换日志面板并同步复制按钮可见性"""
+        toggle_log_panel(_event)
+        copy_button.visible = log_expanded
+        copy_button.update()
+
+    # 标题栏（可点击折叠/展开）
+    title_row = ft.Container(
+        content=ft.Row(
+            controls=[
+                ft.Icon(
+                    ft.CupertinoIcons.DOC_TEXT,
+                    size=16,
+                    color=TEXT_SECONDARY_COLOR,
+                ),
+                ft.Text(
+                    "执行日志",
+                    size=14,
+                    weight=ft.FontWeight.W_600,
+                    color=TEXT_PRIMARY_COLOR,
+                ),
+                ft.Container(expand=True),
+                copy_button,
+                toggle_icon,
+            ],
+            spacing=6,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        on_click=toggle_log_panel_with_copy,
+        ink=True,
+        border_radius=ft.border_radius.all(6),
+        padding=ft.padding.symmetric(horizontal=4, vertical=2),
+    )
 
     return ft.Container(
         content=ft.Column(
             controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(
-                            ft.CupertinoIcons.DOC_TEXT,
-                            size=16,
-                            color=TEXT_SECONDARY_COLOR,
-                        ),
-                        ft.Text(
-                            "执行日志",
-                            size=14,
-                            weight=ft.FontWeight.W_600,
-                            color=TEXT_PRIMARY_COLOR,
-                        ),
-                    ],
-                    spacing=6,
-                ),
-                log_container,
+                drag_handle,
+                title_row,
+                log_body,
             ],
-            spacing=6,
+            spacing=2,
         ),
-        padding=ft.padding.only(top=8),
+        padding=ft.padding.only(top=4),
     )
 
 
@@ -428,7 +598,7 @@ def _build_section_card(
         ),
         bgcolor=ft.Colors.with_opacity(0.4, SURFACE_COLOR),
         border_radius=ft.border_radius.all(12),
-        padding=ft.padding.all(16),
+        padding=ft.padding.symmetric(horizontal=16, vertical=12),
         border=ft.border.all(1, ft.Colors.with_opacity(0.1, "#ffffff")),
     )
 
