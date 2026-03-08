@@ -183,6 +183,7 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
     )
 
     # ---- 时间设置区域（带完整提取开关） ----
+    # 时间设置相关控件（默认隐藏，开启部分截取时显示）
     start_time_field = _make_styled_textfield(
         value=state.start_time,
         hint_text="0:00:00",
@@ -210,19 +211,76 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
         on_select=lambda event: setattr(state, "duration_unit", event.control.value),
     )
 
+    # 部分截取模式的内容区域（使用 animate_size 实现平滑展开/收起）
+    partial_extract_content = ft.Column(
+        controls=[
+            ft.Row(
+                controls=[
+                    ft.Text("开始时间:", size=13, color=TEXT_SECONDARY_COLOR),
+                    start_time_field,
+                    ft.Text("结束时间:", size=13, color=TEXT_SECONDARY_COLOR),
+                    end_time_field,
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            ft.Row(
+                controls=[
+                    ft.Text("持续时长:", size=13, color=TEXT_SECONDARY_COLOR),
+                    duration_value_field,
+                    duration_unit_dropdown,
+                    ft.Row(
+                        controls=[
+                            ft.Icon(
+                                ft.CupertinoIcons.INFO,
+                                size=14,
+                                color=TEXT_SECONDARY_COLOR,
+                            ),
+                            ft.Text(
+                                "填了结束时间则忽略持续时长",
+                                size=12,
+                                color=TEXT_SECONDARY_COLOR,
+                            ),
+                        ],
+                        spacing=4,
+                        tight=True,
+                    ),
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        ],
+        spacing=8,
+    )
+
+    partial_extract_container = ft.Container(
+        content=partial_extract_content,
+        height=0,
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
+        animate_size=ft.Animation(duration=300, curve=ft.AnimationCurve.EASE_IN_OUT),
+        animate_opacity=ft.Animation(duration=300, curve=ft.AnimationCurve.EASE_IN_OUT),
+        opacity=0,
+        padding=ft.padding.only(top=8),
+    )
+
     # 完整提取开关
     def toggle_extract_full(event):
-        """切换完整提取开关"""
+        """切换完整提取/部分截取模式"""
+        # 开关开启（向右）= 提取完整音频 = audio_extract_full = True
+        # 开关关闭（向左）= 部分截取 = audio_extract_full = False
         state.audio_extract_full = event.control.value
-        # 禁用/启用时间设置相关控件
-        start_time_field.disabled = state.audio_extract_full
-        end_time_field.disabled = state.audio_extract_full
-        duration_value_field.disabled = state.audio_extract_full
-        duration_unit_dropdown.disabled = state.audio_extract_full
+        if state.audio_extract_full:
+            # 完整提取模式：隐藏时间设置
+            partial_extract_container.height = 0
+            partial_extract_container.opacity = 0
+        else:
+            # 部分截取模式：显示时间设置
+            partial_extract_container.height = 120
+            partial_extract_container.opacity = 1
         state.page.update()
 
     extract_full_switch = ft.CupertinoSwitch(
-        value=state.audio_extract_full,
+        value=True,  # 默认开启完整提取
         active_track_color=ACCENT_BLUE,
         on_change=toggle_extract_full,
     )
@@ -234,10 +292,6 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
             controls=[
                 ft.Row(
                     controls=[
-                        ft.Text("开始时间:", size=13, color=TEXT_SECONDARY_COLOR),
-                        start_time_field,
-                        ft.Text("结束时间:", size=13, color=TEXT_SECONDARY_COLOR),
-                        end_time_field,
                         ft.Container(expand=True),
                         ft.Text(
                             "提取完整音频",
@@ -251,29 +305,21 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
                 ),
                 ft.Row(
                     controls=[
-                        ft.Text("持续时长:", size=13, color=TEXT_SECONDARY_COLOR),
-                        duration_value_field,
-                        duration_unit_dropdown,
-                        ft.Row(
-                            controls=[
-                                ft.Icon(
-                                    ft.CupertinoIcons.INFO,
-                                    size=14,
-                                    color=TEXT_SECONDARY_COLOR,
-                                ),
-                                ft.Text(
-                                    "填了结束时间则忽略持续时长",
-                                    size=12,
-                                    color=TEXT_SECONDARY_COLOR,
-                                ),
-                            ],
-                            spacing=4,
-                            tight=True,
+                        ft.Icon(
+                            ft.CupertinoIcons.INFO,
+                            size=14,
+                            color=TEXT_SECONDARY_COLOR,
+                        ),
+                        ft.Text(
+                            "开启后将提取视频中的完整音频轨道",
+                            size=12,
+                            color=TEXT_SECONDARY_COLOR,
                         ),
                     ],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=4,
+                    tight=True,
                 ),
+                partial_extract_container,
             ],
             spacing=8,
         ),
