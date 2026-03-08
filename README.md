@@ -1,5 +1,7 @@
 <div align="center">
 
+![Snipkin Icon](assets/icon.png)
+
 # 🎬 Snipkin
 
 _「定格时光的切片，编织光影的诗篇」_
