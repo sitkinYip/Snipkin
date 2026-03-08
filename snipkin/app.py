@@ -73,6 +73,11 @@ class AppState:
     framerate: str = "原始帧率"
     audio_bitrate: str = "原始音频"
 
+    # ---- 音频提取 Tab 状态 ----
+    audio_output_format: str = "mp3"
+    audio_quality: str = "标准品质（192k）"
+    audio_extract_full: bool = True
+
     # ---- 拼接 Tab 状态 ----
     concat_file_list: list[str] = field(default_factory=list)
     concat_output_path: str = ""
@@ -104,6 +109,9 @@ class AppState:
     clip_resolution_dropdown: ft.Dropdown | None = None
     clip_framerate_dropdown: ft.Dropdown | None = None
     clip_audio_bitrate_dropdown: ft.Dropdown | None = None
+
+    # ---- 音频提取 Tab 控件引用（运行时由 build_extract_audio_tab 绑定） ----
+    # 复用截取 Tab 的控件引用字段
 
     # ---- 拼接 Tab 控件引用（运行时由 build_concat_tab 绑定） ----
     concat_output_path_field: ft.TextField | None = None
@@ -274,14 +282,20 @@ def _build_content(state: AppState) -> ft.Column:
     # ---- Tabs（Segmented Control 风格） ----
     from snipkin.ui.clip_tab import build_clip_tab
     from snipkin.ui.concat_tab import build_concat_tab
+    from snipkin.ui.extract_audio_tab import build_extract_audio_tab
     clip_tab_content = build_clip_tab(state)
     concat_tab_content = build_concat_tab(state)
+    extract_audio_tab_content = build_extract_audio_tab(state)
 
     tab_bar = ft.TabBar(
         tabs=[
             ft.Tab(
                 label="视频截取",
                 icon=ft.CupertinoIcons.SCISSORS,
+            ),
+            ft.Tab(
+                label="音频提取",
+                icon=ft.CupertinoIcons.MUSIC_NOTE_2,
             ),
             ft.Tab(
                 label="视频拼接",
@@ -306,6 +320,7 @@ def _build_content(state: AppState) -> ft.Column:
     tab_bar_view = ft.TabBarView(
         controls=[
             clip_tab_content,
+            extract_audio_tab_content,
             concat_tab_content,
         ],
         expand=True,
@@ -314,7 +329,7 @@ def _build_content(state: AppState) -> ft.Column:
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
-        length=2,
+        length=3,
         content=ft.Column(
             controls=[tab_bar, tab_bar_view],
             spacing=0,

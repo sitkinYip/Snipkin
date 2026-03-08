@@ -57,17 +57,20 @@ Snipkin/
     ├── ui/                          # UI 构建子包（纯界面，不含业务逻辑）
     │   ├── __init__.py
     │   ├── clip_tab.py              # 视频截取 Tab 的界面构建
-    │   └── concat_tab.py            # 视频拼接 Tab 的界面构建
+    │   ├── concat_tab.py            # 视频拼接 Tab 的界面构建
+    │   └── extract_audio_tab.py     # 音频提取 Tab 的界面构建
     │
     ├── handlers/                    # 事件处理子包（UI 事件 → core 调用的桥梁层）
     │   ├── __init__.py
     │   ├── clip_handler.py          # 视频截取的事件处理
-    │   └── concat_handler.py        # 视频拼接的事件处理
+    │   ├── concat_handler.py        # 视频拼接的事件处理
+    │   └── extract_audio_handler.py # 音频提取的事件处理
     │
     └── core/                        # 核心业务逻辑子包（与 UI 框架完全解耦）
         ├── __init__.py
         ├── clip_core.py             # 视频截取的参数校验、命令构建与执行
-        └── concat_core.py           # 视频拼接的参数校验、命令构建与执行
+        ├── concat_core.py           # 视频拼接的参数校验、命令构建与执行
+        └── extract_audio_core.py    # 音频提取的参数校验、命令构建与执行
 ```
 
 ---
@@ -103,19 +106,31 @@ Snipkin/
 - UI 交互逻辑（如开关切换、面板展开/收起动画）可以放在 UI 模块中
 - 可定义模块内的辅助函数（如 `_make_styled_textfield`、`_build_compress_section`）
 - **禁止**: 在 UI 模块中编写 ffmpeg 命令构建、文件校验等业务逻辑
+- **包含文件**:
+  - `clip_tab.py`: 视频截取 Tab
+  - `concat_tab.py`: 视频拼接 Tab
+  - `extract_audio_tab.py`: 音频提取 Tab
 
 ### `snipkin/handlers/` — 事件处理模块
 
 - 每个文件提供独立的事件处理函数，作为 UI 事件与 core 层之间的桥梁
-- 负责: 从 `AppState` 收集参数、调用 core 层校验和构建命令、管理子线程执行、更新 UI 状态
+- 负责：从 `AppState` 收集参数、调用 core 层校验和构建命令、管理子线程执行、更新 UI 状态
 - **禁止**: 在 Handler 模块中创建 UI 组件或直接编写 ffmpeg 命令构建逻辑
+- **包含文件**:
+  - `clip_handler.py`: 视频截取事件处理
+  - `concat_handler.py`: 视频拼接事件处理
+  - `extract_audio_handler.py`: 音频提取事件处理
 
 ### `snipkin/core/` — 核心业务逻辑模块
 
 - 每个文件提供纯函数，只接收普通 Python 类型参数（`str` / `float` / `bool` / `list`）
-- 负责: 参数校验、ffmpeg 命令构建、命令执行（通过回调函数通知结果）
+- 负责：参数校验、ffmpeg 命令构建、命令执行（通过回调函数通知结果）
 - **不依赖任何 UI 框架**（Flet / tkinter 等），可独立测试
 - **禁止**: 在 core 模块中导入 `flet` 或访问任何 UI 控件
+- **包含文件**:
+  - `clip_core.py`: 视频截取核心逻辑
+  - `concat_core.py`: 视频拼接核心逻辑
+  - `extract_audio_core.py`: 音频提取核心逻辑
 
 ---
 
@@ -137,7 +152,9 @@ class AppState:
 
 # 各模块通过参数接收 state
 def build_clip_tab(state: AppState) -> ft.Container: ...      # ui/
+def build_extract_audio_tab(state: AppState) -> ft.Container: ...  # ui/
 def handle_clip_run(state: AppState) -> None: ...              # handlers/
+def handle_extract_run(state: AppState) -> None: ...           # handlers/
 def build_clip_ffmpeg_command(...) -> list[str]: ...            # core/（不接收 state）
 ```
 
