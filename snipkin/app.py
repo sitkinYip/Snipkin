@@ -152,6 +152,11 @@ def build_app(page: ft.Page) -> None:
         color_scheme_seed=ACCENT_BLUE,
         font_family="SF Pro Display, Helvetica Neue, Arial",
     )
+    # 设置窗口图标（使用绝对路径）
+    import os
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icon.ico")
+    if os.path.exists(icon_path):
+        page.window.icon = icon_path
 
     # ---- 初始化应用状态 ----
     state = AppState(page=page)
@@ -253,11 +258,14 @@ def _build_content(state: AppState) -> ft.Column:
         主内容的 Column 组件
     """
     # ---- 标题栏 ----
+    import os
+    # 使用绝对路径加载图标，确保打包后也能正确加载
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icon.png")
     title_bar = ft.Container(
         content=ft.Row(
             controls=[
                 ft.Image(
-                    src="icon.png",
+                    src=icon_path,
                     width=24,
                     height=24,
                 ),

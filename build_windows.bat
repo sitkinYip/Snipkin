@@ -6,11 +6,29 @@ echo =========================================
 echo   🚀 开始构建 Snipkin for Windows...
 echo =========================================
 
-:: 1. 检查必要环境
-where pyinstaller >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [警告] 未检测到 PyInstaller，正在使用 pip 安装构建依赖...
-    pip install -r requirements-build.txt
+:: 1. 设置虚拟环境并使用其中的 Python
+set "SCRIPT_DIR=%~dp0"
+set "VENV_DIR=%SCRIPT_DIR%.venv"
+set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
+
+:: 检查虚拟环境是否存在
+if not exist "%VENV_PYTHON%" (
+    echo [错误] 虚拟环境不存在：%VENV_PYTHON%
+    echo 请先运行 run.bat 创建虚拟环境并安装依赖
+    pause
+    exit /b 1
+)
+
+echo [信息] 使用虚拟环境：%VENV_PYTHON%
+
+:: 检查并安装必要的依赖
+echo [信息] 检查并安装必要的依赖...
+"%VENV_PYTHON%" -c "import flet; import flet_desktop; import PyInstaller" 2>nul
+if errorlevel neq 0 (
+    echo [警告] 虚拟环境中缺少必要的依赖，正在安装...
+    "%VENV_PYTHON%" -m pip install --upgrade pip -q
+    "%VENV_PYTHON%" -m pip install -r requirements.txt -q
+    "%VENV_PYTHON%" -m pip install -r requirements-build.txt -q
 )
 
 :: 2. 检查系统中存在的 ffmpeg 和 ffprobe 用于后续绑定提取
@@ -55,15 +73,22 @@ echo [信息] 📦 正在执行 PyInstaller 封装主程序并捆绑音视频组
 :: --icon:              指定带有透明属性的定制图标
 :: --add-binary:        将依赖的 .exe 文件捆绑进去。格式: SRC;DEST
 
-pyinstaller --noconfirm --noconsole --onefile ^
+"%VENV_PYTHON%" -m PyInstaller --noconfirm --noconsole --onefile ^
     --name "Snipkin" ^
     --icon "assets/icon.ico" ^
+    --add-data "assets;assets" ^
     --add-binary "%FFMPEG_PATH%;." ^
     --add-binary "%FFPROBE_PATH%;." ^
     --hidden-import "flet" ^
     --hidden-import "flet.core" ^
+    --hidden-import "flet.core.controls" ^
+    --hidden-import "flet.core.cupertino_icons" ^
     --hidden-import "flet_runtime" ^
+    --hidden-import "flet_desktop" ^
     --hidden-import "PIL._tkinter_finder" ^
+    --collect-all "flet" ^
+    --collect-all "flet_runtime" ^
+    --collect-all "flet_desktop" ^
     main.py
 
 echo =========================================
