@@ -7,20 +7,21 @@ _「定格时光的切片，编织光影的诗篇」_
 **跨平台 · 现代化 GUI · 高性能视频处理利器**
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-blue.svg?style=flat-square)](https://www.python.org/)
-[![CustomTkinter](https://img.shields.io/badge/Interface-CustomTkinter-42a5f5.svg?style=flat-square)](https://github.com/TomSchimansky/CustomTkinter)
+[![Flet](https://img.shields.io/badge/Framework-Flet-42a5f5.svg?style=flat-square)](https://flet.dev/)
 [![FFmpeg](https://img.shields.io/badge/Powered%20by-FFmpeg-5fb151.svg?style=flat-square)](https://ffmpeg.org/)
+[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg?style=flat-square)](https://github.com/sitkinYip/Snipkin/releases)
 
 </div>
 
 ## 📖 序言 | Introduction
 
-> **这是一款基于 Python 与 FFmpeg 的轻量级桌面应用，专为视频的高效截取、多段无缝拼接以及格式压缩而设计。**
+> **这是一款基于 Python 与 FFmpeg 的轻量级桌面应用，专为视频的高效截取、多段无缝拼接以及音频提取而设计。**
 
 在这个影像泛滥的时代，我们比以往任何时候都更需要一款纯粹、轻量、且优雅的工具，来修剪冗余的片段，将散落的记忆串联成珠。
 
-**Snipkin** 诞生于此。它是一把数字化的精工剪刀，基于强大的底层引擎 `ffmpeg` 构建，却隐藏了命令行的冰冷与繁琐。通过现代化、类 macOS 风格的用户界面，Snipkin 致力于为您提供丝滑如水的视频截取与拼接体验。
+**Snipkin** 诞生于此。它是一把数字化的精工剪刀，基于强大的底层引擎 `ffmpeg` 构建，却隐藏了命令行的冰冷与繁琐。通过现代化、类 macOS 风格的用户界面，Snipkin 致力于为您提供丝滑如水的视频截取、拼接与音频提取体验。
 
-无论您是想要珍藏某个惊艳的瞬间，还是将多段旅途见闻融合为一部光影集锦，Snipkin 都能以极简的操作流，助您轻松达成。
+无论您是想要珍藏某个惊艳的瞬间，将多段旅途见闻融合为一部光影集锦，还是从视频中提取高品质音频，Snipkin 都能以极简的操作流，助您轻松达成。
 
 ---
 
@@ -28,6 +29,7 @@ _「定格时光的切片，编织光影的诗篇」_
 
 - ✂️ **精准截取**：支持帧级时间轴切割，可通过时间区间或持续时长提取视频片段。
 - 🔗 **无缝拼接**：多段视频完美连接，内置 16 种（如淡入淡出、滑动等）过渡动画，画面自然流畅。
+- 🎵 **音频提取**：从视频中提取高品质音频，支持 MP3、AAC、FLAC、WAV、M4A、OGG 六种格式，可选音质等级。
 - 🗜️ **智能压缩**：提供一键式质量预设（高/中/低），支持自定义分辨率、帧率及音频码率。
 - 🚀 **智能命名与导出**：文件名自动附加时间戳防止覆盖，支持手动编辑保存路径，并能自动创建不存在的输出文件夹。
 - 🎨 **现代化交互**：深浅色主题自适应切换，保存路径对话框智能记忆当前输入的内容。
@@ -95,7 +97,15 @@ chmod +x run.sh
 4. 确认 **输出设置**：系统会自动生成带时间戳的文件名，您也可以**手动直接编辑**输入框中的路径。
 5. 点击 **保存路径**（可选）或直接点击 **开始截取**。如果手动填写的文件夹不存在，系统将自动为您创建。
 
-### 🔗 任务二：视频拼接 (Concat)
+### 🎵 任务二：音频提取 (Extract Audio)
+
+1. 切换到 **音频提取** Tab，点击 **选择文件** 载入视频文件。
+2. （可选）关闭 **提取完整音频** 开关，设置开始时间与结束时间来截取部分音频。
+3. 选择 **输出格式**：MP3、AAC、FLAC、WAV、M4A 或 OGG。
+4. 选择 **输出音质**：高品质 (320k)、标准品质 (192k) 或低品质 (128k)。
+5. 点击 **开始提取**，即可从视频中分离出高品质音频。
+
+### 🔗 任务三：视频拼接 (Concat)
 
 1. 点击 **添加文件** 导入多段零散的视频。可通过**上移/下移**调整合并顺序。
 2. （可选）为拼接处选择一种 **过渡效果** (如淡入淡出等) 并可设置过渡时间。
