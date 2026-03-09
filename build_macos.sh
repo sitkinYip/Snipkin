@@ -48,7 +48,35 @@ pyinstaller --noconfirm --windowed --name "Snipkin" \
     --hidden-import "PIL._tkinter_finder" \
     main.py
 
+echo "✅ macOS .app 构建完成！位于 dist/Snipkin.app"
+
+# 5. 将 .app 封装为 .dmg 磁盘映像
+echo "💿 正在生成 DMG 磁盘映像..."
+
+DMG_NAME="Snipkin.dmg"
+DMG_PATH="dist/$DMG_NAME"
+DMG_TEMP_DIR="dist/dmg_staging"
+
+# 清理可能残留的旧 DMG 文件和临时目录
+rm -f "$DMG_PATH"
+rm -rf "$DMG_TEMP_DIR"
+
+# 创建临时目录，放入 .app 和 Applications 快捷方式
+mkdir -p "$DMG_TEMP_DIR"
+cp -R dist/Snipkin.app "$DMG_TEMP_DIR/"
+ln -s /Applications "$DMG_TEMP_DIR/Applications"
+
+# 使用 hdiutil 创建 DMG
+hdiutil create -volname "Snipkin" \
+    -srcfolder "$DMG_TEMP_DIR" \
+    -ov -format UDZO \
+    "$DMG_PATH"
+
+# 清理临时目录
+rm -rf "$DMG_TEMP_DIR"
+
 echo "========================================="
-echo "🎉 macOS .app 构建完成！位于 dist/Snipkin.app"
-echo "你可以直接双击运行它，或者将其拖入 Applications 目录。"
+echo "🎉 macOS 构建全部完成！"
+echo "   .app 位于: dist/Snipkin.app"
+echo "   .dmg 位于: dist/$DMG_NAME"
 echo "========================================="
