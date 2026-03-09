@@ -459,7 +459,7 @@ def _build_concat_compress_section(state: AppState) -> ft.Container:
         """切换高级选项面板的展开/收起状态"""
         state.concat_advanced_visible = not state.concat_advanced_visible
         if state.concat_advanced_visible:
-            advanced_container.height = 110
+            advanced_container.height = None
             advanced_container.opacity = 1
             advanced_toggle_icon.rotate = ft.Rotate(1.5708)
         else:

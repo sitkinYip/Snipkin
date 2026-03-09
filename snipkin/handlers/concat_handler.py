@@ -34,6 +34,8 @@ from snipkin.core.concat_core import (
 if TYPE_CHECKING:
     from snipkin.app import AppState
 
+from snipkin.app import hide_loading, show_loading, show_toast
+
 
 def _log(state: AppState, message: str) -> None:
     """
@@ -160,9 +162,11 @@ def handle_concat_move_up(
         file_list_view: ListView 控件引用
     """
     index = state.concat_selected_index
+    if index == -1:
+        show_toast(state, "请先点击选中要移动的文件")
+        return
     if index <= 0 or index >= len(state.concat_file_list):
-        if index == -1:
-            _log(state, "请先点击选中要移动的文件。")
+        show_toast(state, "已在列表顶部，无法继续上移")
         return
     state.concat_file_list[index], state.concat_file_list[index - 1] = (
         state.concat_file_list[index - 1], state.concat_file_list[index],
@@ -191,9 +195,11 @@ def handle_concat_move_down(
         file_list_view: ListView 控件引用
     """
     index = state.concat_selected_index
+    if index == -1:
+        show_toast(state, "请先点击选中要移动的文件")
+        return
     if index < 0 or index >= len(state.concat_file_list) - 1:
-        if index == -1:
-            _log(state, "请先点击选中要移动的文件。")
+        show_toast(state, "已在列表底部，无法继续下移")
         return
     state.concat_file_list[index], state.concat_file_list[index + 1] = (
         state.concat_file_list[index + 1], state.concat_file_list[index],
@@ -217,8 +223,13 @@ def handle_concat_clear(
         state:          应用状态实例
         file_list_view: ListView 控件引用
     """
+    if not state.concat_file_list:
+        show_toast(state, "文件列表已经是空的")
+        return
     state.concat_file_list.clear()
+    state.concat_selected_index = -1
     _refresh_file_list(state, file_list_view)
+    show_toast(state, "已清空文件列表", "#34C759")
     _log(state, "已清空文件列表。")
 
 
@@ -301,13 +312,17 @@ def handle_concat_run(state: AppState) -> None:
     _log(state, f"▶ 执行命令: {' '.join(command)}")
 
     # 禁用按钮，防止重复点击
-    run_button_container = state.concat_run_button
-    if run_button_container is not None:
-        inner_button = run_button_container.content
+    run_button_wrapper = state.concat_run_button
+    if run_button_wrapper is not None:
+        glow_container = run_button_wrapper.content
+        inner_button = glow_container.content
         inner_button.disabled = True
         inner_button.content = ft.Text("处理中...", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.HOURGLASS
         state.page.update()
+
+    # 显示 Loading 覆盖层
+    show_loading(state, "正在拼接视频...")
 
     # ---- 在子线程中调用 core 层执行命令 ----
     thread = threading.Thread(
@@ -320,22 +335,14 @@ def handle_concat_run(state: AppState) -> None:
 
 def _show_snackbar(state: AppState, message: str, color: str) -> None:
     """
-    通过 page.overlay 显示 SnackBar 通知。
+    通过 show_toast 显示 SnackBar 通知。
 
     参数:
         state:   应用状态实例
         message: 通知消息文本
         color:   SnackBar 背景色
     """
-    if state.page is not None:
-        snackbar = ft.SnackBar(
-            content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
-            bgcolor=color,
-            duration=3000,
-            open=True,
-        )
-        state.page.overlay.append(snackbar)
-        state.page.update()
+    show_toast(state, message, color)
 
 def _run_concat_ffmpeg_in_thread(
     state: AppState,
@@ -377,14 +384,16 @@ def _restore_concat_run_button(state: AppState) -> None:
     """
     恢复拼接按钮到可点击状态。
 
-    在 ffmpeg 命令执行完成后（无论成功或失败）调用。
+    在 ffmpeg 命令执行完成后（无论成功或失败）调用，并隐藏 Loading 覆盖层。
 
     参数:
         state: 应用状态实例
     """
-    run_button_container = state.concat_run_button
-    if run_button_container is not None:
-        inner_button = run_button_container.content
+    hide_loading(state)
+    run_button_wrapper = state.concat_run_button
+    if run_button_wrapper is not None:
+        glow_container = run_button_wrapper.content
+        inner_button = glow_container.content
         inner_button.disabled = False
         inner_button.content = ft.Text("开始拼接", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.PLAY_ARROW_SOLID

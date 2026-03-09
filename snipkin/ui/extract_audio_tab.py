@@ -207,7 +207,7 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
     duration_unit_dropdown = _make_styled_dropdown(
         value=state.duration_unit,
         options=list(DURATION_UNITS.keys()),
-        width=90,
+        width=110,
         on_select=lambda event: setattr(state, "duration_unit", event.control.value),
     )
 
@@ -275,7 +275,7 @@ def build_extract_audio_tab(state: AppState) -> ft.Container:
             partial_extract_container.opacity = 0
         else:
             # 部分截取模式：显示时间设置
-            partial_extract_container.height = 120
+            partial_extract_container.height = None
             partial_extract_container.opacity = 1
         state.page.update()
 
@@ -497,4 +497,7 @@ def _build_glow_run_button(
 
     glow_container.on_hover = on_hover
 
-    return glow_container
+    return ft.GestureDetector(
+        content=glow_container,
+        mouse_cursor=ft.MouseCursor.CLICK,
+    )

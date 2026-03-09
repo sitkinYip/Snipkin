@@ -30,6 +30,8 @@ from snipkin.core.clip_core import (
 if TYPE_CHECKING:
     from snipkin.app import AppState
 
+from snipkin.app import hide_loading, show_loading, show_toast
+
 
 def _log(state: AppState, message: str) -> None:
     """
@@ -169,13 +171,17 @@ def handle_clip_run(state: AppState) -> None:
     _log(state, f"▶ 执行命令: {' '.join(command)}")
 
     # 禁用按钮，防止重复点击
-    run_button_container = state.clip_run_button
-    if run_button_container is not None:
-        inner_button = run_button_container.content
+    run_button_wrapper = state.clip_run_button
+    if run_button_wrapper is not None:
+        glow_container = run_button_wrapper.content
+        inner_button = glow_container.content
         inner_button.disabled = True
         inner_button.content = ft.Text("处理中...", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.HOURGLASS
         state.page.update()
+
+    # 显示 Loading 覆盖层
+    show_loading(state, "正在截取视频...")
 
     # ---- 在子线程中调用 core 层执行命令 ----
     thread = threading.Thread(
@@ -188,22 +194,14 @@ def handle_clip_run(state: AppState) -> None:
 
 def _show_snackbar(state: AppState, message: str, color: str) -> None:
     """
-    通过 page.overlay 显示 SnackBar 通知。
+    通过 show_toast 显示 SnackBar 通知。
 
     参数:
         state:   应用状态实例
         message: 通知消息文本
         color:   SnackBar 背景色
     """
-    if state.page is not None:
-        snackbar = ft.SnackBar(
-            content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
-            bgcolor=color,
-            duration=3000,
-            open=True,
-        )
-        state.page.overlay.append(snackbar)
-        state.page.update()
+    show_toast(state, message, color)
 
 def _run_clip_ffmpeg_in_thread(
     state: AppState,
@@ -243,14 +241,16 @@ def _restore_clip_run_button(state: AppState) -> None:
     恢复截取按钮到可点击状态。
 
     在 ffmpeg 命令执行完成后（无论成功或失败）调用，
-    将按钮文本和状态恢复为初始值。
+    将按钮文本和状态恢复为初始值，并隐藏 Loading 覆盖层。
 
     参数:
         state: 应用状态实例
     """
-    run_button_container = state.clip_run_button
-    if run_button_container is not None:
-        inner_button = run_button_container.content
+    hide_loading(state)
+    run_button_wrapper = state.clip_run_button
+    if run_button_wrapper is not None:
+        glow_container = run_button_wrapper.content
+        inner_button = glow_container.content
         inner_button.disabled = False
         inner_button.content = ft.Text("开始截取", size=15, weight=ft.FontWeight.W_600)
         inner_button.icon = ft.CupertinoIcons.PLAY_ARROW_SOLID

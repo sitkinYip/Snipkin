@@ -211,7 +211,7 @@ def build_clip_tab(state: AppState) -> ft.Container:
     duration_unit_dropdown = _make_styled_dropdown(
         value=state.duration_unit,
         options=list(DURATION_UNITS.keys()),
-        width=90,
+        width=110,
         on_select=lambda event: setattr(state, "duration_unit", event.control.value),
     )
 
@@ -437,7 +437,7 @@ def _build_compress_section(state: AppState) -> ft.Container:
         """切换高级选项面板的展开/收起状态"""
         state.advanced_visible = not state.advanced_visible
         if state.advanced_visible:
-            advanced_container.height = 110
+            advanced_container.height = None
             advanced_container.opacity = 1
             advanced_toggle_icon.rotate = ft.Rotate(1.5708)
         else:
@@ -608,4 +608,7 @@ def _build_glow_run_button(
 
     glow_container.on_hover = on_hover
 
-    return glow_container
+    return ft.GestureDetector(
+        content=glow_container,
+        mouse_cursor=ft.MouseCursor.CLICK,
+    )

@@ -111,7 +111,10 @@ class AppState:
     clip_audio_bitrate_dropdown: ft.Dropdown | None = None
 
     # ---- 音频提取 Tab 控件引用（运行时由 build_extract_audio_tab 绑定） ----
-    # 复用截取 Tab 的控件引用字段
+    audio_run_button: ft.Container | None = None
+
+    # ---- Loading 覆盖层控件引用（运行时由 _build_root_layout 绑定） ----
+    loading_overlay: ft.Container | None = None
 
     # ---- 拼接 Tab 控件引用（运行时由 build_concat_tab 绑定） ----
     concat_output_path_field: ft.TextField | None = None
@@ -226,8 +229,12 @@ def _build_root_layout(state: AppState) -> ft.Stack:
         content=_build_content(state),
     )
 
+    # Layer 4: Loading 覆盖层（默认隐藏）
+    loading_overlay = _build_loading_overlay()
+    state.loading_overlay = loading_overlay
+
     return ft.Stack(
-        controls=[gradient_background, blur_overlay, content_layer],
+        controls=[gradient_background, blur_overlay, content_layer, loading_overlay],
         expand=True,
     )
 
@@ -578,6 +585,120 @@ def _build_log_section(state: AppState) -> ft.Container:
 
 
 # ============================================================
+# Loading 覆盖层
+# ============================================================
+
+def _build_loading_overlay() -> ft.Container:
+    """
+    构建全局 Loading 覆盖层，用于异步任务执行时的视觉反馈。
+
+    覆盖层包含半透明深色背景 + 居中的毛玻璃卡片 + 旋转动画环 + 提示文字。
+    默认隐藏（visible=False），通过 show_loading / hide_loading 控制显隐。
+
+    返回:
+        Loading 覆盖层的 Container 组件
+    """
+    loading_ring = ft.ProgressRing(
+        width=36,
+        height=36,
+        stroke_width=3,
+        color=ACCENT_BLUE,
+    )
+
+    loading_text = ft.Text(
+        "正在处理，请稍候...",
+        size=14,
+        weight=ft.FontWeight.W_500,
+        color=TEXT_PRIMARY_COLOR,
+    )
+
+    loading_card = ft.Container(
+        content=ft.Column(
+            controls=[loading_ring, loading_text],
+            spacing=16,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        width=220,
+        height=130,
+        bgcolor=ft.Colors.with_opacity(0.85, SURFACE_COLOR),
+        border_radius=ft.border_radius.all(16),
+        border=ft.border.all(1, ft.Colors.with_opacity(0.15, "#ffffff")),
+        alignment=ft.Alignment(0, 0),
+        shadow=ft.BoxShadow(
+            spread_radius=1,
+            blur_radius=24,
+            color=ft.Colors.with_opacity(0.5, "#000000"),
+            offset=ft.Offset(0, 4),
+        ),
+        blur=ft.Blur(sigma_x=20, sigma_y=20),
+        padding=ft.padding.all(24),
+    )
+
+    return ft.Container(
+        content=loading_card,
+        expand=True,
+        bgcolor=ft.Colors.with_opacity(0.4, "#000000"),
+        alignment=ft.Alignment(0, 0),
+        visible=False,
+        animate_opacity=ft.Animation(duration=200, curve=ft.AnimationCurve.EASE_OUT),
+    )
+
+def show_loading(state: AppState, message: str = "正在处理，请稍候...") -> None:
+    """
+    显示全局 Loading 覆盖层。
+
+    在异步任务（视频截取、拼接、音频提取）开始时调用，
+    阻止用户操作并提供视觉反馈。
+
+    参数:
+        state:   应用状态实例
+        message: Loading 提示文字
+    """
+    if state.loading_overlay is not None:
+        # 更新提示文字
+        loading_card = state.loading_overlay.content
+        loading_column = loading_card.content
+        loading_column.controls[1].value = message
+        state.loading_overlay.visible = True
+        state.page.update()
+
+def hide_loading(state: AppState) -> None:
+    """
+    隐藏全局 Loading 覆盖层。
+
+    在异步任务完成后（无论成功或失败）调用。
+
+    参数:
+        state: 应用状态实例
+    """
+    if state.loading_overlay is not None:
+        state.loading_overlay.visible = False
+        state.page.update()
+
+def show_toast(state: AppState, message: str, color: str = "#636366") -> None:
+    """
+    显示 Toast 提示（SnackBar）。
+
+    用于按钮点击后的即时反馈，如参数缺失、操作无效等场景。
+    默认使用中性灰色背景，错误使用红色，成功使用绿色。
+
+    参数:
+        state:   应用状态实例
+        message: 提示消息文本
+        color:   SnackBar 背景色（默认中性灰）
+    """
+    if state.page is not None:
+        snackbar = ft.SnackBar(
+            content=ft.Text(message, color="#ffffff", weight=ft.FontWeight.W_500),
+            bgcolor=color,
+            duration=3000,
+            open=True,
+        )
+        state.page.overlay.append(snackbar)
+        state.page.update()
+
+# ============================================================
 # 通用 UI 组件工厂函数
 # ============================================================
 
@@ -632,9 +753,11 @@ def _build_action_button(
     on_click: ft.ControlEvent | None = None,
     color: str = ACCENT_BLUE,
     hover_color: str = ACCENT_BLUE_HOVER,
-) -> ft.ElevatedButton:
+) -> ft.GestureDetector:
     """
-    构建一个 Apple 风格的操作按钮。
+    构建一个 Apple 风格的操作按钮，带手型鼠标指针。
+
+    使用 GestureDetector 包裹 ElevatedButton，使鼠标悬停时显示手型光标。
 
     参数:
         text:        按钮文本
@@ -644,9 +767,9 @@ def _build_action_button(
         hover_color: 悬停背景色
 
     返回:
-        ElevatedButton 组件
+        带手型指针的 GestureDetector 组件
     """
-    return ft.ElevatedButton(
+    button = ft.ElevatedButton(
         content=ft.Text(text, size=13, weight=ft.FontWeight.W_500),
         icon=icon,
         on_click=on_click,
@@ -657,6 +780,10 @@ def _build_action_button(
             padding=ft.padding.symmetric(horizontal=16, vertical=10),
         ),
         height=38,
+    )
+    return ft.GestureDetector(
+        content=button,
+        mouse_cursor=ft.MouseCursor.CLICK,
     )
 
 
