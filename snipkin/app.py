@@ -110,8 +110,17 @@ class AppState:
     clip_framerate_dropdown: ft.Dropdown | None = None
     clip_audio_bitrate_dropdown: ft.Dropdown | None = None
 
+    # ---- 音频压缩 Tab 状态 ----
+    compress_audio_input_path: str = ""
+    compress_audio_output_path: str = ""
+    compress_audio_output_format: str = "mp3"
+    compress_audio_quality: str = "标准品质（128k）"
+
     # ---- 音频提取 Tab 控件引用（运行时由 build_extract_audio_tab 绑定） ----
     audio_run_button: ft.Container | None = None
+
+    # ---- 音频压缩 Tab 控件引用（运行时由 build_compress_audio_tab 绑定） ----
+    compress_audio_run_button: ft.GestureDetector | None = None
 
     # ---- Loading 覆盖层控件引用（运行时由 _build_root_layout 绑定） ----
     loading_overlay: ft.Container | None = None
@@ -298,9 +307,11 @@ def _build_content(state: AppState) -> ft.Column:
     from snipkin.ui.clip_tab import build_clip_tab
     from snipkin.ui.concat_tab import build_concat_tab
     from snipkin.ui.extract_audio_tab import build_extract_audio_tab
+    from snipkin.ui.compress_audio_tab import build_compress_audio_tab
     clip_tab_content = build_clip_tab(state)
     concat_tab_content = build_concat_tab(state)
     extract_audio_tab_content = build_extract_audio_tab(state)
+    compress_audio_tab_content = build_compress_audio_tab(state)
 
     tab_bar = ft.TabBar(
         tabs=[
@@ -311,6 +322,10 @@ def _build_content(state: AppState) -> ft.Column:
             ft.Tab(
                 label="音频提取",
                 icon=ft.CupertinoIcons.MUSIC_NOTE_2,
+            ),
+            ft.Tab(
+                label="音频压缩",
+                icon=ft.CupertinoIcons.ARCHIVEBOX,
             ),
             ft.Tab(
                 label="视频拼接",
@@ -336,6 +351,7 @@ def _build_content(state: AppState) -> ft.Column:
         controls=[
             clip_tab_content,
             extract_audio_tab_content,
+            compress_audio_tab_content,
             concat_tab_content,
         ],
         expand=True,
@@ -344,7 +360,7 @@ def _build_content(state: AppState) -> ft.Column:
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
-        length=3,
+        length=4,
         content=ft.Column(
             controls=[tab_bar, tab_bar_view],
             spacing=0,

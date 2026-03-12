@@ -58,19 +58,22 @@ Snipkin/
     │   ├── __init__.py
     │   ├── clip_tab.py              # 视频截取 Tab 的界面构建
     │   ├── concat_tab.py            # 视频拼接 Tab 的界面构建
-    │   └── extract_audio_tab.py     # 音频提取 Tab 的界面构建
+    │   ├── extract_audio_tab.py     # 音频提取 Tab 的界面构建
+    │   └── compress_audio_tab.py    # 音频压缩 Tab 的界面构建
     │
     ├── handlers/                    # 事件处理子包（UI 事件 → core 调用的桥梁层）
     │   ├── __init__.py
     │   ├── clip_handler.py          # 视频截取的事件处理
     │   ├── concat_handler.py        # 视频拼接的事件处理
-    │   └── extract_audio_handler.py # 音频提取的事件处理
+    │   ├── extract_audio_handler.py # 音频提取的事件处理
+    │   └── compress_audio_handler.py # 音频压缩的事件处理
     │
     └── core/                        # 核心业务逻辑子包（与 UI 框架完全解耦）
         ├── __init__.py
         ├── clip_core.py             # 视频截取的参数校验、命令构建与执行
         ├── concat_core.py           # 视频拼接的参数校验、命令构建与执行
-        └── extract_audio_core.py    # 音频提取的参数校验、命令构建与执行
+        ├── extract_audio_core.py    # 音频提取的参数校验、命令构建与执行
+        └── compress_audio_core.py   # 音频压缩的参数校验、命令构建与执行
 ```
 
 ---
@@ -110,6 +113,7 @@ Snipkin/
   - `clip_tab.py`: 视频截取 Tab
   - `concat_tab.py`: 视频拼接 Tab
   - `extract_audio_tab.py`: 音频提取 Tab
+  - `compress_audio_tab.py`: 音频压缩 Tab
 
 ### `snipkin/handlers/` — 事件处理模块
 
@@ -120,6 +124,7 @@ Snipkin/
   - `clip_handler.py`: 视频截取事件处理
   - `concat_handler.py`: 视频拼接事件处理
   - `extract_audio_handler.py`: 音频提取事件处理
+  - `compress_audio_handler.py`: 音频压缩事件处理
 
 ### `snipkin/core/` — 核心业务逻辑模块
 
@@ -131,6 +136,7 @@ Snipkin/
   - `clip_core.py`: 视频截取核心逻辑
   - `concat_core.py`: 视频拼接核心逻辑
   - `extract_audio_core.py`: 音频提取核心逻辑
+  - `compress_audio_core.py`: 音频压缩核心逻辑
 
 ---
 
